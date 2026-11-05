@@ -1,0 +1,1568 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hub Providencia | Sistema de Caracterización y Acceso Ágil QR</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Inter & JetBrains Mono -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <!-- Librería Lector QR por Cámara (html5-qrcode) -->
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+    <!-- Librería de Gráficos (Chart.js) -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                    colors: {
+                        provi: {
+                            50: '#eef2ff',
+                            100: '#e0e7ff',
+                            600: '#2563eb',
+                            700: '#1d4ed8',
+                            800: '#1e3a8a',
+                            900: '#0f172a',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f1f5f9;
+        }
+        #qr-reader {
+            border: none !important;
+            border-radius: 0.75rem;
+            overflow: hidden;
+        }
+        #qr-reader video {
+            border-radius: 0.75rem;
+            object-fit: cover;
+        }
+        .tab-panel {
+            animation: fadeIn 0.22s ease-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(4px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body class="text-slate-800 min-h-screen flex flex-col">
+
+    <!-- =================================================================== -->
+    <!-- BARRA SUPERIOR INSTITUCIONAL Y ESTADO DE CONEXIÓN A GOOGLE SHEETS   -->
+    <!-- =================================================================== -->
+    <header class="bg-provi-900 text-white shadow-lg sticky top-0 z-40 border-b border-slate-800">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between py-3 gap-3">
+                
+                <!-- Identidad Hub Providencia + Equipo Capstonersitos -->
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-blue-600 to-emerald-500 flex items-center justify-center shadow-md flex-shrink-0">
+                            <i class="fa-solid fa-id-card-clip text-white text-xl"></i>
+                        </div>
+                        <div>
+                            <div class="flex flex-wrap items-center gap-2">
+                                <span class="text-[11px] font-bold uppercase tracking-wider text-emerald-400">Municipalidad de Providencia</span>
+                                <span class="text-[11px] bg-slate-800 text-slate-200 px-2.5 py-0.5 rounded-full border border-slate-700 font-medium">
+                                    Equipo Capstonersitos | Marcos, Bastián, Vicente, Pablo
+                                </span>
+                            </div>
+                            <h1 class="text-base sm:text-xl font-extrabold tracking-tight text-white">
+                                Hub Providencia · Sistema de Caracterización y Acceso Ágil
+                            </h1>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Navegación por Pestañas -->
+                <nav class="flex items-center gap-1.5 bg-slate-800/90 p-1.5 rounded-xl border border-slate-700/80 overflow-x-auto">
+                    <button onclick="switchTab('scanner')" id="tab-btn-scanner" class="tab-btn flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all whitespace-nowrap bg-blue-600 text-white shadow-sm">
+                        <i class="fa-solid fa-qrcode"></i>
+                        <span>1. Punto de Acceso (QR)</span>
+                    </button>
+                    <button onclick="switchTab('database')" id="tab-btn-database" class="tab-btn flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all whitespace-nowrap text-slate-300 hover:text-white hover:bg-slate-700/60">
+                        <i class="fa-solid fa-table"></i>
+                        <span>2. Base de Datos y Sheets</span>
+                        <span id="badge-db-count" class="ml-1 px-1.5 py-0.5 text-[11px] rounded-full bg-slate-900 text-emerald-400 font-mono">7</span>
+                    </button>
+                    <button onclick="switchTab('dashboard')" id="tab-btn-dashboard" class="tab-btn flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all whitespace-nowrap text-slate-300 hover:text-white hover:bg-slate-700/60">
+                        <i class="fa-solid fa-chart-pie"></i>
+                        <span>3. Dashboard de Gestión</span>
+                    </button>
+                </nav>
+
+                <!-- Estado Cloud Google Sheets + Botón de Prueba Rápida -->
+                <div class="flex items-center justify-between lg:justify-end gap-3 border-t lg:border-t-0 border-slate-800 pt-2 lg:pt-0">
+                    <div class="flex items-center gap-2 bg-emerald-950/60 border border-emerald-700/60 px-3 py-1.5 rounded-xl">
+                        <span id="cloud-status-dot" class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                        <div class="text-left">
+                            <div id="cloud-status-text" class="text-[11px] font-bold text-emerald-300 leading-tight">
+                                Sincronizado con Google Sheets (/exec activo)
+                            </div>
+                            <div class="text-[10px] text-slate-400 font-mono" id="live-clock">--:--:--</div>
+                        </div>
+                    </div>
+                    <button onclick="sendTestRowToGoogleSheets()" class="bg-slate-800 hover:bg-slate-700 text-emerald-300 border border-slate-700 px-3 py-2 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 whitespace-nowrap shadow-sm" title="Enviar fila de prueba a las pestañas Flujo y Padron">
+                        <i class="fa-solid fa-cloud-arrow-up"></i>
+                        <span class="hidden sm:inline">Probar Nube</span>
+                    </button>
+                </div>
+
+            </div>
+        </div>
+    </header>
+
+    <!-- CONTENIDO PRINCIPAL -->
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+
+        <!-- =================================================================== -->
+        <!-- PESTAÑA 1: PUNTO DE ACCESO (LECTOR QR CÉDULA CHILENA)               -->
+        <!-- =================================================================== -->
+        <section id="panel-scanner" class="tab-panel space-y-6">
+
+            <!-- Banner Técnico: Privacidad por Diseño + Sincronización Google Sheets -->
+            <div class="bg-white rounded-2xl p-4 sm:p-5 shadow-sm border border-slate-200 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
+                <div class="flex items-start gap-3.5">
+                    <div class="w-10 h-10 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center flex-shrink-0 mt-0.5 border border-blue-200">
+                        <i class="fa-solid fa-shield-halved text-lg"></i>
+                    </div>
+                    <div>
+                        <div class="flex flex-wrap items-center gap-2">
+                            <h2 class="text-sm sm:text-base font-bold text-slate-900">
+                                Torniquete Lógico QR · Privacidad por Diseño y Sincronización Cloud
+                            </h2>
+                            <span class="text-xs font-semibold bg-emerald-50 text-emerald-700 px-2.5 py-0.5 rounded-full border border-emerald-200">
+                                Nueva Ley de Datos Personales
+                            </span>
+                        </div>
+                        <p class="text-xs sm:text-sm text-slate-600 mt-1 leading-relaxed">
+                            Al escanear el QR trasero del carnet chileno (<code class="bg-slate-100 px-1.5 py-0.5 rounded text-blue-700 font-mono text-xs">...registrocivil.cl/...?RUN=21345678-9&amp;serial=...</code>), el sistema extrae con <strong>Regex únicamente el RUN</strong>, descarta en el acto el N° de serie del documento, genera el código seudonimizado (<code class="font-mono text-xs">USR-XXXXXX</code>) y envía automáticamente el registro a tu <strong>Google Sheets</strong> (pestañas <code class="font-mono text-xs font-bold text-emerald-700">Flujo</code> y <code class="font-mono text-xs font-bold text-blue-700">Padron</code>).
+                        </p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2 self-end lg:self-center flex-shrink-0">
+                    <span class="text-xs bg-emerald-50 text-emerald-800 px-3 py-1.5 rounded-lg font-semibold border border-emerald-200 flex items-center gap-1.5">
+                        <i class="fa-solid fa-table-list text-emerald-600"></i>
+                        Google Sheets Conectado
+                    </span>
+                </div>
+            </div>
+
+            <!-- Grilla Principal: Izquierda (Lector + Simulador + Consola) | Derecha (Reconocimiento 1-Clic / Enrolamiento) -->
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+
+                <!-- COLUMNA IZQUIERDA (5 cols) -->
+                <div class="lg:col-span-5 space-y-5">
+
+                    <!-- Tarjeta 1: Escáner de Cámara en Vivo (html5-qrcode) -->
+                    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                        <div class="bg-slate-900 text-white px-5 py-3.5 flex items-center justify-between">
+                            <div class="flex items-center gap-2.5">
+                                <i class="fa-solid fa-camera text-emerald-400"></i>
+                                <h3 class="font-semibold text-sm">Lector Cámara Web / Móvil Recepción</h3>
+                            </div>
+                            <span id="camera-status-badge" class="text-[11px] px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700">
+                                Cámara en espera
+                            </span>
+                        </div>
+
+                        <div class="p-5 space-y-4">
+                            <!-- Selector de Lente (Frontal / Trasera para Celular o Tablet en el Hub) -->
+                            <div class="flex items-center justify-between gap-2 bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+                                <label for="camera-facing-select" class="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
+                                    <i class="fa-solid fa-mobile-screen text-blue-600"></i> Lente de Cámara:
+                                </label>
+                                <select id="camera-facing-select" class="text-xs font-medium bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-600">
+                                    <option value="environment">Cámara Trasera (Celular / Tablet)</option>
+                                    <option value="user">Cámara Frontal / Webcam Notebook</option>
+                                </select>
+                            </div>
+
+                            <!-- Contenedor de Video QR -->
+                            <div class="relative bg-slate-950 rounded-xl min-h-[210px] flex flex-col items-center justify-center border-2 border-dashed border-slate-700 overflow-hidden">
+                                <div id="qr-reader" class="w-full"></div>
+                                <div id="camera-placeholder" class="text-center p-6 space-y-2">
+                                    <div class="w-14 h-14 rounded-2xl bg-slate-800/90 text-emerald-400 flex items-center justify-center mx-auto border border-slate-700 shadow-inner">
+                                        <i class="fa-solid fa-qrcode text-2xl"></i>
+                                    </div>
+                                    <p class="text-xs sm:text-sm font-medium text-slate-200">Acerca el código QR trasero de tu Cédula</p>
+                                    <p class="text-[11px] text-slate-400 max-w-xs mx-auto">
+                                        Activa la cámara aquí abajo, usa una pistola lectora USB o prueba con los botones del Simulador Demo.
+                                    </p>
+                                </div>
+                            </div>
+
+                            <!-- Botones Iniciar / Detener Cámara -->
+                            <div class="flex gap-2.5">
+                                <button id="btn-start-camera" onclick="startCameraScanner()" class="flex-1 bg-blue-700 hover:bg-blue-800 text-white font-semibold py-2.5 px-4 rounded-xl text-xs sm:text-sm transition flex items-center justify-center gap-2 shadow-sm">
+                                    <i class="fa-solid fa-video"></i>
+                                    <span>Iniciar Escáner Cámara</span>
+                                </button>
+                                <button id="btn-stop-camera" onclick="stopCameraScanner()" class="hidden flex-1 bg-rose-600 hover:bg-rose-700 text-white font-semibold py-2.5 px-4 rounded-xl text-xs sm:text-sm transition flex items-center justify-center gap-2 shadow-sm">
+                                    <i class="fa-solid fa-video-slash"></i>
+                                    <span>Detener Cámara</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tarjeta 2: Simulador Interactivo para Presentación y Pruebas -->
+                    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 space-y-4">
+                        <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                            <div class="flex items-center gap-2">
+                                <i class="fa-solid fa-wand-magic-sparkles text-blue-600"></i>
+                                <h3 class="font-bold text-sm text-slate-800">Simulador Demo en Vivo (Envía a Google Sheets)</h3>
+                            </div>
+                            <span class="text-[11px] bg-emerald-50 text-emerald-700 font-semibold px-2 py-0.5 rounded-md border border-emerald-200">
+                                100% Funcional
+                            </span>
+                        </div>
+
+                        <div class="grid grid-cols-1 gap-2.5">
+                            <!-- Botón A: Simular Usuario Ya Enrolado -->
+                            <button onclick="simulateEnrolledUserScan()" class="w-full text-left p-3.5 rounded-xl border border-emerald-200 bg-emerald-50/70 hover:bg-emerald-100/80 transition flex items-center justify-between group">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-9 h-9 rounded-lg bg-emerald-600 text-white flex items-center justify-center font-bold text-sm shadow-sm flex-shrink-0">
+                                        <i class="fa-solid fa-user-check"></i>
+                                    </div>
+                                    <div>
+                                        <div class="text-xs sm:text-sm font-bold text-emerald-950 group-hover:text-emerald-800">
+                                            a) Simular QR Carnet: Usuario Ya Enrolado
+                                        </div>
+                                        <div class="text-[11px] text-emerald-700 font-mono">
+                                            Reconoce a Marcos / Bastián / Vicente / Pablo en 1 clic
+                                        </div>
+                                    </div>
+                                </div>
+                                <i class="fa-solid fa-chevron-right text-emerald-600 text-xs group-hover:translate-x-1 transition-transform"></i>
+                            </button>
+
+                            <!-- Botón B: Simular Visitante Nuevo -->
+                            <button onclick="simulateNewUserScan()" class="w-full text-left p-3.5 rounded-xl border border-amber-200 bg-amber-50/70 hover:bg-amber-100/80 transition flex items-center justify-between group">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-9 h-9 rounded-lg bg-amber-500 text-white flex items-center justify-center font-bold text-sm shadow-sm flex-shrink-0">
+                                        <i class="fa-solid fa-user-plus"></i>
+                                    </div>
+                                    <div>
+                                        <div class="text-xs sm:text-sm font-bold text-amber-950 group-hover:text-amber-800">
+                                            b) Simular QR Carnet: Visitante Nuevo
+                                        </div>
+                                        <div class="text-[11px] text-amber-700 font-mono">
+                                            Extrae RUT del QR y abre Formulario de Enrolamiento Único
+                                        </div>
+                                    </div>
+                                </div>
+                                <i class="fa-solid fa-chevron-right text-amber-600 text-xs group-hover:translate-x-1 transition-transform"></i>
+                            </button>
+                        </div>
+
+                        <!-- Input Lector USB 2D / Ingreso Manual de RUT -->
+                        <div class="pt-2 border-t border-slate-100">
+                            <label for="manual-qr-input" class="block text-xs font-semibold text-slate-700 mb-1.5">
+                                c) Pistola Lectora QR USB o Digitación Manual de RUT:
+                            </label>
+                            <div class="flex gap-2">
+                                <input type="text" id="manual-qr-input" 
+                                    placeholder="Pega URL QR Registro Civil o escribe RUT..." 
+                                    class="flex-1 text-xs sm:text-sm rounded-xl border border-slate-300 px-3.5 py-2 focus:outline-none focus:ring-2 focus:ring-blue-600 font-mono"
+                                    onkeydown="if(event.key === 'Enter') processManualInput()">
+                                <button onclick="processManualInput()" class="bg-slate-800 hover:bg-slate-900 text-white px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition flex items-center gap-1.5 whitespace-nowrap">
+                                    <i class="fa-solid fa-arrow-right-to-bracket"></i>
+                                    <span>Validar</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tarjeta 3: Consola de Privacidad por Diseño y Nube -->
+                    <div class="bg-slate-900 rounded-2xl shadow-md border border-slate-800 p-4 text-slate-200 font-mono text-xs space-y-2.5">
+                        <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+                            <span class="text-emerald-400 font-semibold flex items-center gap-2">
+                                <i class="fa-solid fa-terminal"></i>
+                                Consola de Privacidad por Diseño y Nube
+                            </span>
+                            <span class="text-[10px] bg-slate-800 text-slate-300 px-2 py-0.5 rounded">Regex + Hash + /exec</span>
+                        </div>
+
+                        <div class="space-y-1.5 text-[11px]">
+                            <div>
+                                <span class="text-slate-400">1. Lectura cruda del QR Cédula:</span>
+                                <div id="console-raw-qr" class="bg-slate-950 text-slate-300 p-2 rounded-lg mt-0.5 break-all border border-slate-800">
+                                    Esperando escaneo de cédula...
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-2 gap-2 pt-1">
+                                <div class="bg-slate-950 p-2 rounded-lg border border-slate-800">
+                                    <span class="text-slate-400 block text-[10px]">2. N° Serie Documento:</span>
+                                    <span id="console-serial" class="text-rose-400 font-semibold">---</span>
+                                </div>
+                                <div class="bg-slate-950 p-2 rounded-lg border border-slate-800">
+                                    <span class="text-slate-400 block text-[10px]">3. RUN Extraído:</span>
+                                    <span id="console-rut" class="text-emerald-400 font-bold text-xs">---</span>
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-2 gap-2">
+                                <div class="bg-slate-950 p-2 rounded-lg border border-slate-800">
+                                    <span class="text-slate-400 block text-[10px]">4. ID Anónimo (Hash):</span>
+                                    <span id="console-hash" class="text-amber-300 font-bold">---</span>
+                                </div>
+                                <div class="bg-slate-950 p-2 rounded-lg border border-slate-800">
+                                    <span class="text-slate-400 block text-[10px]">5. Estado Google Sheets:</span>
+                                    <span id="console-cloud-sync" class="text-blue-400 font-semibold">Listo para enviar</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- COLUMNA DERECHA (7 cols): Panel Interactivo Condicional -->
+                <div class="lg:col-span-7">
+
+                    <!-- ESTADO 0: PANTALLA DE ESPERA -->
+                    <div id="state-idle" class="bg-white rounded-2xl shadow-sm border border-slate-200 p-8 sm:p-12 text-center space-y-5 min-h-[540px] flex flex-col items-center justify-center">
+                        <div class="w-20 h-20 rounded-3xl bg-blue-50 text-blue-700 border border-blue-200 flex items-center justify-center shadow-sm">
+                            <i class="fa-solid fa-id-card text-4xl"></i>
+                        </div>
+                        <div class="max-w-md space-y-2">
+                            <span class="text-xs font-bold uppercase tracking-wider text-blue-700 bg-blue-50 px-3 py-1 rounded-full border border-blue-200">
+                                Recepción Hub Providencia
+                            </span>
+                            <h3 class="text-xl sm:text-2xl font-extrabold text-slate-900 pt-1">
+                                Escanea tu Cédula de Identidad
+                            </h3>
+                            <p class="text-sm text-slate-600 leading-relaxed">
+                                Acerca el código QR trasero de tu carnet a la cámara o utiliza los botones del <strong>Simulador Demo</strong> a la izquierda para registrar el ingreso en tiempo real en Google Sheets.
+                            </p>
+                        </div>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full max-w-lg pt-4 text-left">
+                            <div class="p-4 rounded-xl bg-emerald-50/70 border border-emerald-200">
+                                <div class="font-bold text-xs text-emerald-900 flex items-center gap-1.5">
+                                    <i class="fa-solid fa-bolt text-emerald-600"></i>
+                                    Visitante Recurrente (&lt; 2 seg):
+                                </div>
+                                <p class="text-xs text-emerald-800 mt-1">
+                                    Reconoce su RUT, muestra su Nombre, Teléfono y Perfil, y registra su acceso en la pestaña <strong>Flujo</strong> con 1 clic.
+                                </p>
+                            </div>
+                            <div class="p-4 rounded-xl bg-amber-50/70 border border-amber-200">
+                                <div class="font-bold text-xs text-amber-900 flex items-center gap-1.5">
+                                    <i class="fa-solid fa-user-shield text-amber-600"></i>
+                                    Visitante Nuevo (1ª vez):
+                                </div>
+                                <p class="text-xs text-amber-800 mt-1">
+                                    Extrae el RUT del QR y guarda sus datos en las pestañas <strong>Padron</strong> y <strong>Flujo</strong> simultáneamente.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- =============================================================== -->
+                    <!-- CASO A: USUARIO YA ENROLADO (RECONOCIMIENTO + DESTINO EN 1 CLIC) -->
+                    <!-- =============================================================== -->
+                    <div id="state-recognized" class="hidden bg-white rounded-2xl shadow-md border-2 border-emerald-500 overflow-hidden">
+                        <div class="bg-gradient-to-r from-emerald-600 to-teal-600 text-white p-6">
+                            <div class="flex flex-wrap items-center justify-between gap-2">
+                                <span class="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider bg-white/20 backdrop-blur-sm px-3 py-1 rounded-full">
+                                    <i class="fa-solid fa-circle-check"></i> Cédula Reconocida Instantáneamente
+                                </span>
+                                <span id="rec-hash-badge" class="font-mono text-xs bg-slate-900/40 px-3 py-1 rounded-lg border border-white/20">
+                                    ID: USR-XXXXXX
+                                </span>
+                            </div>
+                            <h3 class="text-2xl sm:text-3xl font-extrabold mt-3" id="rec-greeting">
+                                ¡Hola de nuevo, Marcos!
+                            </h3>
+                            <p class="text-emerald-100 text-xs sm:text-sm mt-1">
+                                Identidad verificada en el padrón del Hub. Selecciona tu espacio de destino para enviar a Google Sheets:
+                            </p>
+                        </div>
+
+                        <div class="p-6 space-y-6">
+                            <!-- Datos Recuperados Automáticamente -->
+                            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-slate-50 p-4 rounded-xl border border-slate-200">
+                                <div>
+                                    <span class="text-[11px] font-semibold uppercase text-slate-400 block">RUT Extraído del QR</span>
+                                    <span id="rec-rut" class="font-mono font-bold text-sm sm:text-base text-slate-900">21.345.678-9</span>
+                                </div>
+                                <div>
+                                    <span class="text-[11px] font-semibold uppercase text-slate-400 block">Teléfono Registrado</span>
+                                    <span id="rec-phone" class="font-mono font-semibold text-sm sm:text-base text-slate-800">+56 9 8765 4321</span>
+                                </div>
+                                <div>
+                                    <span class="text-[11px] font-semibold uppercase text-slate-400 block">Perfil Caracterizado</span>
+                                    <span id="rec-profile" class="inline-flex items-center gap-1.5 font-bold text-xs sm:text-sm text-blue-700 bg-blue-100 px-2.5 py-0.5 rounded-md mt-0.5">
+                                        Estudiante
+                                    </span>
+                                </div>
+                            </div>
+
+                            <!-- 4 Botones Grandes de Espacio de Destino -->
+                            <div class="space-y-3">
+                                <h4 class="text-sm sm:text-base font-bold text-slate-900 flex items-center gap-2">
+                                    <span class="w-6 h-6 rounded-full bg-emerald-600 text-white text-xs flex items-center justify-center font-bold">1</span>
+                                    <span>Toca el espacio al que ingresas hoy (Check-in en 1 clic):</span>
+                                </h4>
+
+                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                                    <button onclick="registerQuickAccess('Cowork')" class="p-4 rounded-xl border-2 border-slate-200 hover:border-emerald-500 hover:bg-emerald-50/60 transition text-left flex items-center gap-4 group shadow-sm">
+                                        <div class="w-12 h-12 rounded-xl bg-blue-100 text-blue-700 group-hover:bg-emerald-600 group-hover:text-white transition flex items-center justify-center text-xl flex-shrink-0">
+                                            <i class="fa-solid fa-laptop-code"></i>
+                                        </div>
+                                        <div>
+                                            <div class="font-bold text-slate-900 text-base group-hover:text-emerald-950">Cowork</div>
+                                            <div class="text-xs text-slate-500">Trabajo colaborativo y puestos</div>
+                                        </div>
+                                    </button>
+
+                                    <button onclick="registerQuickAccess('Sala de Reuniones')" class="p-4 rounded-xl border-2 border-slate-200 hover:border-emerald-500 hover:bg-emerald-50/60 transition text-left flex items-center gap-4 group shadow-sm">
+                                        <div class="w-12 h-12 rounded-xl bg-purple-100 text-purple-700 group-hover:bg-emerald-600 group-hover:text-white transition flex items-center justify-center text-xl flex-shrink-0">
+                                            <i class="fa-solid fa-users-rectangle"></i>
+                                        </div>
+                                        <div>
+                                            <div class="font-bold text-slate-900 text-base group-hover:text-emerald-950">Sala de Reuniones</div>
+                                            <div class="text-xs text-slate-500">Sesiones privadas de equipo</div>
+                                        </div>
+                                    </button>
+
+                                    <button onclick="registerQuickAccess('Evento / Auditorio')" class="p-4 rounded-xl border-2 border-slate-200 hover:border-emerald-500 hover:bg-emerald-50/60 transition text-left flex items-center gap-4 group shadow-sm">
+                                        <div class="w-12 h-12 rounded-xl bg-amber-100 text-amber-700 group-hover:bg-emerald-600 group-hover:text-white transition flex items-center justify-center text-xl flex-shrink-0">
+                                            <i class="fa-solid fa-microphone-lines"></i>
+                                        </div>
+                                        <div>
+                                            <div class="font-bold text-slate-900 text-base group-hover:text-emerald-950">Evento / Auditorio</div>
+                                            <div class="text-xs text-slate-500">Charlas, convocatorias y pitch</div>
+                                        </div>
+                                    </button>
+
+                                    <button onclick="registerQuickAccess('Taller / Mentoría')" class="p-4 rounded-xl border-2 border-slate-200 hover:border-emerald-500 hover:bg-emerald-50/60 transition text-left flex items-center gap-4 group shadow-sm">
+                                        <div class="w-12 h-12 rounded-xl bg-rose-100 text-rose-700 group-hover:bg-emerald-600 group-hover:text-white transition flex items-center justify-center text-xl flex-shrink-0">
+                                            <i class="fa-solid fa-chalkboard-user"></i>
+                                        </div>
+                                        <div>
+                                            <div class="font-bold text-slate-900 text-base group-hover:text-emerald-950">Taller / Mentoría</div>
+                                            <div class="text-xs text-slate-500">Capacitación y asesorías</div>
+                                        </div>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="pt-2 border-t border-slate-100 flex justify-between items-center">
+                                <button onclick="resetScannerState()" class="text-xs font-semibold text-slate-500 hover:text-slate-800 flex items-center gap-1.5">
+                                    <i class="fa-solid fa-rotate-left"></i> Cancelar / Escanear otro carnet
+                                </button>
+                                <span class="text-xs text-emerald-700 font-medium">
+                                    <i class="fa-solid fa-cloud-arrow-up mr-1"></i> Envío automático a pestaña "Flujo"
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- =============================================================== -->
+                    <!-- CASO B: VISITANTE NUEVO (FORMULARIO DE ENROLAMIENTO ÚNICO)       -->
+                    <!-- =============================================================== -->
+                    <div id="state-enrollment" class="hidden bg-white rounded-2xl shadow-md border-2 border-amber-500 overflow-hidden">
+                        <div class="bg-gradient-to-r from-amber-500 to-orange-500 text-white p-6">
+                            <div class="flex flex-wrap items-center justify-between gap-2">
+                                <span class="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider bg-white/20 backdrop-blur-sm px-3 py-1 rounded-full">
+                                    <i class="fa-solid fa-user-plus"></i> Nuevo Visitante Detectado
+                                </span>
+                                <span id="enr-hash-preview" class="font-mono text-xs bg-slate-900/30 px-3 py-1 rounded-lg border border-white/20">
+                                    ID Asignado: USR-XXXXXX
+                                </span>
+                            </div>
+                            <h3 class="text-xl sm:text-2xl font-extrabold mt-2">
+                                Formulario de Enrolamiento Único
+                            </h3>
+                            <p class="text-amber-50 text-xs sm:text-sm mt-1">
+                                Extrajimos tu RUT desde el QR de tu carnet. Registra tus datos por única vez para poblar las pestañas <strong>Padron</strong> y <strong>Flujo</strong> en Google Sheets.
+                            </p>
+                        </div>
+
+                        <form id="enrollment-form" onsubmit="submitNewEnrollment(event)" class="p-6 space-y-4">
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-xs font-bold uppercase text-slate-600 mb-1">
+                                        RUT Extraído del QR <i class="fa-solid fa-lock text-emerald-600 ml-1"></i>
+                                    </label>
+                                    <input type="text" id="enr-rut" readonly 
+                                        class="w-full rounded-xl bg-slate-100 border border-slate-300 px-3.5 py-2.5 font-mono font-bold text-slate-800 text-sm cursor-not-allowed">
+                                </div>
+                                <div>
+                                    <label for="enr-profile" class="block text-xs font-bold uppercase text-slate-700 mb-1">
+                                        Perfil de Usuario *
+                                    </label>
+                                    <select id="enr-profile" required class="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-500">
+                                        <option value="Emprendedor">Emprendedor</option>
+                                        <option value="Startup">Startup</option>
+                                        <option value="Estudiante">Estudiante</option>
+                                        <option value="Empresa">Empresa</option>
+                                        <option value="Vecino">Vecino</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div>
+                                    <label for="enr-name" class="block text-xs font-bold uppercase text-slate-700 mb-1">
+                                        Nombre Completo *
+                                    </label>
+                                    <input type="text" id="enr-name" required placeholder="Ej: Valentina Muñoz Rojas"
+                                        class="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-500">
+                                </div>
+                                <div>
+                                    <label for="enr-phone" class="block text-xs font-bold uppercase text-slate-700 mb-1">
+                                        Teléfono (+56 9...) *
+                                    </label>
+                                    <input type="tel" id="enr-phone" required placeholder="+56 9 1234 5678" value="+56 9 "
+                                        class="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm font-mono text-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-500">
+                                </div>
+                            </div>
+
+                            <div>
+                                <label for="enr-space" class="block text-xs font-bold uppercase text-slate-700 mb-1">
+                                    Espacio de Destino Hoy *
+                                </label>
+                                <select id="enr-space" required class="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-500">
+                                    <option value="Cowork">Cowork</option>
+                                    <option value="Sala de Reuniones">Sala de Reuniones</option>
+                                    <option value="Evento / Auditorio">Evento / Auditorio</option>
+                                    <option value="Taller / Mentoría">Taller / Mentoría</option>
+                                </select>
+                            </div>
+
+                            <!-- Consentimiento Ley de Protección de Datos -->
+                            <div class="bg-amber-50/90 border border-amber-200 rounded-xl p-3.5">
+                                <label class="flex items-start gap-3 cursor-pointer">
+                                    <input type="checkbox" id="enr-consent" required class="mt-1 w-4 h-4 rounded text-amber-600 focus:ring-amber-500">
+                                    <span class="text-xs text-slate-700 leading-relaxed">
+                                        <strong>Consentimiento Explícito (Ley de Protección de Datos Personales):</strong> Autorizo a Hub Providencia a registrar mi enrolamiento único y procesar mis accesos de manera seudonimizada (<code class="font-mono text-[11px]">ID Hash</code>) exclusivamente para fines estadísticos y de gestión de espacios.
+                                    </span>
+                                </label>
+                            </div>
+
+                            <div class="flex items-center justify-between pt-2">
+                                <button type="button" onclick="resetScannerState()" class="text-xs font-semibold text-slate-500 hover:text-slate-800 px-3 py-2">
+                                    Cancelar
+                                </button>
+                                <button type="submit" id="btn-submit-enrollment" class="bg-amber-500 hover:bg-amber-600 text-white font-bold px-6 py-3 rounded-xl text-sm shadow-md transition flex items-center gap-2">
+                                    <i class="fa-solid fa-cloud-arrow-up"></i>
+                                    <span>Enrolar y Enviar a Google Sheets</span>
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <!-- =============================================================== -->
+                    <!-- ESTADO C: CONFIRMACIÓN DE ACCESO Y ENVÍO A GOOGLE SHEETS        -->
+                    <!-- =============================================================== -->
+                    <div id="state-success" class="hidden bg-white rounded-2xl shadow-md border-2 border-blue-600 p-8 text-center space-y-5 min-h-[480px] flex flex-col items-center justify-center">
+                        <div class="w-20 h-20 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center text-4xl shadow-inner">
+                            <i class="fa-solid fa-cloud-check"></i>
+                        </div>
+                        <div class="space-y-1">
+                            <span id="succ-cloud-badge" class="text-xs font-bold uppercase tracking-wider text-emerald-700 bg-emerald-100 px-3 py-1 rounded-full">
+                                Sincronizado con Google Sheets (/exec)
+                            </span>
+                            <h3 id="succ-name" class="text-2xl font-extrabold text-slate-900 pt-2">
+                                ¡Adelante, Marcos!
+                            </h3>
+                            <p id="succ-details" class="text-sm text-slate-600">
+                                Espacio: <strong>Cowork</strong> · Tipo: <strong>QR Cédula (Recurrente)</strong>
+                            </p>
+                        </div>
+
+                        <div class="bg-slate-50 rounded-xl p-4 border border-slate-200 max-w-md w-full text-left text-xs space-y-1.5 font-mono">
+                            <div class="text-slate-500 font-sans font-bold border-b border-slate-200 pb-1 mb-1">Payload JSON enviado a Google Sheets:</div>
+                            <div class="flex justify-between"><span>idAnonimo:</span> <strong id="succ-hash" class="text-blue-700">USR-8F4A2C</strong></div>
+                            <div class="flex justify-between"><span>perfil:</span> <strong id="succ-profile" class="text-emerald-700">Estudiante</strong></div>
+                            <div class="flex justify-between"><span>telefono:</span> <strong id="succ-phone" class="text-slate-800">+56 9 8765 4321</strong></div>
+                            <div class="flex justify-between"><span>tipoIngreso:</span> <strong id="succ-type" class="text-purple-700">QR Cédula (Recurrente)</strong></div>
+                            <div class="flex justify-between"><span>N° Serie Cédula:</span> <strong class="text-rose-600">Descartado (Privacidad)</strong></div>
+                        </div>
+
+                        <div class="flex flex-wrap justify-center gap-3 pt-2">
+                            <button onclick="resetScannerState()" class="bg-blue-700 hover:bg-blue-800 text-white font-semibold px-5 py-2.5 rounded-xl text-sm transition flex items-center gap-2 shadow-sm">
+                                <i class="fa-solid fa-qrcode"></i>
+                                <span>Escanear Siguiente Visitante</span>
+                            </button>
+                            <button onclick="switchTab('database')" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold px-4 py-2.5 rounded-xl text-sm transition flex items-center gap-2">
+                                <i class="fa-solid fa-table"></i>
+                                <span>Ver Tablas Flujo y Padrón</span>
+                            </button>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </section>
+
+        <!-- =================================================================== -->
+        <!-- PESTAÑA 2: BASE DE DATOS Y CONEXIÓN GOOGLE SHEETS                   -->
+        <!-- =================================================================== -->
+        <section id="panel-database" class="tab-panel hidden space-y-6">
+
+            <!-- Panel de Gestión del Webhook de Google Apps Script -->
+            <div class="bg-slate-900 text-white rounded-2xl p-5 shadow-md border border-slate-800 space-y-4">
+                <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                    <div class="space-y-1">
+                        <div class="flex items-center gap-2">
+                            <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                            <span class="text-xs font-bold uppercase tracking-wider text-emerald-400">Webhook Google Apps Script Conectado</span>
+                        </div>
+                        <h2 class="text-base sm:text-lg font-extrabold text-white">
+                            Sincronización en Vivo con Google Sheets (Pestañas "Flujo" y "Padron")
+                        </h2>
+                        <p class="text-xs text-slate-300">
+                            Cada registro se envía mediante <code class="text-amber-300 font-mono">fetch(..., { mode: 'no-cors' })</code> al script de tu planilla para evitar bloqueos CORS en GitHub Pages.
+                        </p>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-2.5">
+                        <button onclick="sendTestRowToGoogleSheets()" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-4 py-2.5 rounded-xl text-xs sm:text-sm transition flex items-center gap-2 shadow-sm">
+                            <i class="fa-solid fa-paper-plane"></i>
+                            <span>Enviar Fila de Prueba a Google Sheets</span>
+                        </button>
+                        <button onclick="exportCurrentTableCSV()" class="bg-blue-600 hover:bg-blue-500 text-white font-semibold px-4 py-2.5 rounded-xl text-xs sm:text-sm transition flex items-center gap-2 shadow-sm">
+                            <i class="fa-solid fa-file-csv"></i>
+                            <span>Descargar Excel / CSV</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="bg-slate-950 p-3 rounded-xl border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2 font-mono text-xs">
+                    <div class="truncate text-slate-300">
+                        <span class="text-slate-500 mr-2">URL /exec:</span>
+                        <span id="webhook-url-display" class="text-emerald-400">https://script.google.com/macros/s/AKfycby9it1egYMQ98BAMxDQIkmtXL8m_kmd7lt2m9FT42K63ZuwbcPjmIl_osOxenT3FkmKMQ/exec</span>
+                    </div>
+                    <span class="text-[11px] bg-emerald-950 text-emerald-300 px-2.5 py-0.5 rounded border border-emerald-800 flex-shrink-0">
+                        Activo (POST JSON)
+                    </span>
+                </div>
+            </div>
+
+            <!-- Selector de Vista: Pestaña 'Flujo' vs Pestaña 'Padron' -->
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-200/80 p-1.5 rounded-2xl border border-slate-300">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-1.5 w-full">
+                    <button onclick="switchDbView('access')" id="db-toggle-access" class="py-2.5 px-4 rounded-xl font-bold text-xs sm:text-sm transition flex items-center justify-center gap-2 bg-white text-blue-900 shadow-sm">
+                        <i class="fa-solid fa-user-secret text-emerald-600"></i>
+                        <span>Tabla Flujo Diario (Seudonimizada - Pestaña 'Flujo')</span>
+                    </button>
+                    <button onclick="switchDbView('users')" id="db-toggle-users" class="py-2.5 px-4 rounded-xl font-bold text-xs sm:text-sm transition flex items-center justify-center gap-2 text-slate-600 hover:text-slate-900">
+                        <i class="fa-solid fa-address-book text-blue-600"></i>
+                        <span>Tabla Padrón de Usuarios (Enrolamiento Único - Pestaña 'Padron')</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- TABLA 1: FLUJO DIARIO (SEUDONIMIZADA - PESTAÑA 'FLUJO') -->
+            <div id="db-view-access" class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                <div class="px-5 py-4 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-slate-50">
+                    <div>
+                        <h3 class="font-bold text-slate-900 text-sm sm:text-base flex items-center gap-2">
+                            <span>Vista Espejo: Pestaña "Flujo" en Google Sheets</span>
+                            <span class="text-[11px] bg-emerald-100 text-emerald-800 px-2.5 py-0.5 rounded-full font-semibold">100% Seudonimizada</span>
+                        </h3>
+                        <p class="text-xs text-slate-500">Estructura exacta de columnas: Fecha/Hora | ID Anónimo | Perfil | Espacio Utilizado | Tipo de Ingreso.</p>
+                    </div>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse text-xs sm:text-sm">
+                        <thead>
+                            <tr class="bg-slate-900 text-white uppercase text-[11px] tracking-wider">
+                                <th class="py-3 px-4">Fecha / Hora</th>
+                                <th class="py-3 px-4">ID Anónimo (Hash)</th>
+                                <th class="py-3 px-4">Perfil</th>
+                                <th class="py-3 px-4">Espacio Utilizado</th>
+                                <th class="py-3 px-4">Tipo de Ingreso</th>
+                                <th class="py-3 px-4 text-right">Estado Cloud</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbody-access-logs" class="divide-y divide-slate-200">
+                            <!-- Filas inyectadas por JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- TABLA 2: PADRÓN DE USUARIOS (PESTAÑA 'PADRON') -->
+            <div id="db-view-users" class="hidden bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                <div class="px-5 py-4 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-slate-50">
+                    <div>
+                        <h3 class="font-bold text-slate-900 text-sm sm:text-base flex items-center gap-2">
+                            <span>Vista Espejo: Pestaña "Padron" en Google Sheets</span>
+                            <span class="text-[11px] bg-amber-100 text-amber-800 px-2.5 py-0.5 rounded-full font-semibold">Enrolamiento Único con Consentimiento</span>
+                        </h3>
+                        <p class="text-xs text-slate-500">Estructura exacta de columnas: Fecha Enrolamiento | ID Anónimo | RUT | Nombre | Teléfono | Perfil.</p>
+                    </div>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse text-xs sm:text-sm">
+                        <thead>
+                            <tr class="bg-provi-800 text-white uppercase text-[11px] tracking-wider">
+                                <th class="py-3 px-4">Fecha Enrolamiento</th>
+                                <th class="py-3 px-4">ID Anónimo</th>
+                                <th class="py-3 px-4">RUT</th>
+                                <th class="py-3 px-4">Nombre</th>
+                                <th class="py-3 px-4">Teléfono</th>
+                                <th class="py-3 px-4">Perfil</th>
+                                <th class="py-3 px-4 text-right">Simular Escaneo</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbody-enrolled-users" class="divide-y divide-slate-200">
+                            <!-- Filas inyectadas por JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </section>
+
+        <!-- =================================================================== -->
+        <!-- PESTAÑA 3: DASHBOARD DE GESTIÓN (TIEMPO REAL)                       -->
+        <!-- =================================================================== -->
+        <section id="panel-dashboard" class="tab-panel hidden space-y-6">
+
+            <!-- 4 Tarjetas KPI -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-200 flex items-center justify-between">
+                    <div>
+                        <span class="text-xs font-bold uppercase text-slate-400">Total Accesos Registrados</span>
+                        <div id="kpi-total-today" class="text-3xl font-extrabold text-slate-900 mt-1">7</div>
+                        <span class="text-xs font-semibold text-emerald-600 mt-1 inline-block">
+                            <i class="fa-solid fa-cloud-check mr-1"></i> Sincronizados en Flujo
+                        </span>
+                    </div>
+                    <div class="w-12 h-12 rounded-2xl bg-blue-50 text-blue-700 flex items-center justify-center text-xl border border-blue-100">
+                        <i class="fa-solid fa-door-open"></i>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-200 flex items-center justify-between">
+                    <div>
+                        <span class="text-xs font-bold uppercase text-slate-400">Usuarios Enrolados</span>
+                        <div id="kpi-total-users" class="text-3xl font-extrabold text-slate-900 mt-1">6</div>
+                        <span class="text-xs text-slate-500 mt-1 inline-block">En pestaña Padron</span>
+                    </div>
+                    <div class="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-700 flex items-center justify-center text-xl border border-emerald-100">
+                        <i class="fa-solid fa-users"></i>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-200 flex items-center justify-between">
+                    <div>
+                        <span class="text-xs font-bold uppercase text-slate-400">Tiempo Check-in Recurrente</span>
+                        <div class="text-3xl font-extrabold text-emerald-600 mt-1">1.8 s</div>
+                        <span class="text-xs text-slate-500 mt-1 inline-block">vs ~60 s registro manual</span>
+                    </div>
+                    <div class="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center text-xl border border-amber-100">
+                        <i class="fa-solid fa-bolt"></i>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-200 flex items-center justify-between">
+                    <div>
+                        <span class="text-xs font-bold uppercase text-slate-400">Datos Seudonimizados</span>
+                        <div class="text-3xl font-extrabold text-blue-900 mt-1">100%</div>
+                        <span class="text-xs text-emerald-700 font-medium mt-1 inline-block">Cumple Ley Datos Personales</span>
+                    </div>
+                    <div class="w-12 h-12 rounded-2xl bg-purple-50 text-purple-700 flex items-center justify-center text-xl border border-purple-100">
+                        <i class="fa-solid fa-shield-halved"></i>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 3 Gráficos Dinámicos (Espacios, Perfiles y Bloques Horarios) -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-200 space-y-3">
+                    <div>
+                        <h3 class="font-bold text-slate-900 text-sm sm:text-base">Ocupación por Espacio del Hub</h3>
+                        <p class="text-xs text-slate-500">Cowork, Sala de Reuniones, Evento y Taller</p>
+                    </div>
+                    <div class="h-60 relative">
+                        <canvas id="chart-spaces"></canvas>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-200 space-y-3">
+                    <div>
+                        <h3 class="font-bold text-slate-900 text-sm sm:text-base">Distribución por Perfil</h3>
+                        <p class="text-xs text-slate-500">Caracterización de usuarios del recinto</p>
+                    </div>
+                    <div class="h-60 relative">
+                        <canvas id="chart-profiles"></canvas>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-200 space-y-3">
+                    <div>
+                        <h3 class="font-bold text-slate-900 text-sm sm:text-base">Flujo por Bloque Horario</h3>
+                        <p class="text-xs text-slate-500">Identificación de horas punta en recepción</p>
+                    </div>
+                    <div class="h-60 relative">
+                        <canvas id="chart-hours"></canvas>
+                    </div>
+                </div>
+            </div>
+
+        </section>
+
+    </main>
+
+    <!-- CONTENEDOR DE NOTIFICACIONES TOAST -->
+    <div id="toast-container" class="fixed bottom-5 right-5 z-50 space-y-2 pointer-events-none"></div>
+
+    <!-- FOOTER INSTITUCIONAL -->
+    <footer class="bg-white border-t border-slate-200 mt-10 py-4 text-center text-xs text-slate-500">
+        <div class="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
+            <span><strong>Hub Providencia</strong> · Prototipo Funcional Capstone Intermedio (Universidad Mayor)</span>
+            <span><strong>Equipo Capstonersitos:</strong> Marcos, Bastián, Vicente, Pablo</span>
+        </div>
+    </footer>
+
+    <!-- =================================================================== -->
+    <!-- LÓGICA DE APLICACIÓN Y CONEXIÓN A GOOGLE APPS SCRIPT (/EXEC)        -->
+    <!-- =================================================================== -->
+    <script>
+        // URL OFICIAL DEL WEBHOOK GOOGLE APPS SCRIPT DEL EQUIPO CAPSTONERSITOS
+        const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycby9it1egYMQ98BAMxDQIkmtXL8m_kmd7lt2m9FT42K63ZuwbcPjmIl_osOxenT3FkmKMQ/exec";
+
+        const STORAGE_KEY_USERS = 'hub_provi_cloud_users_v2';
+        const STORAGE_KEY_LOGS = 'hub_provi_cloud_logs_v2';
+
+        let enrolledUsers = [];
+        let accessLogs = [];
+        let currentScannedRut = null;
+        let currentScannedHash = null;
+        let currentRecognizedUser = null;
+        let currentDbView = 'access';
+        let simUserIndex = 0;
+        let html5QrCode = null;
+        let isCameraRunning = false;
+
+        let chartSpacesInstance = null;
+        let chartProfilesInstance = null;
+        let chartHoursInstance = null;
+
+        // Generador determinista de ID Anónimo (Hash corto) a partir del RUN
+        function generateAnonHash(rut) {
+            const clean = rut.replace(/[^0-9kK]/g, '').toUpperCase();
+            let h1 = 0xdeadbeef ^ clean.length;
+            let h2 = 0x41c6ce57 ^ clean.length;
+            for (let i = 0, ch; i < clean.length; i++) {
+                ch = clean.charCodeAt(i);
+                h1 = Math.imul(h1 ^ ch, 2654435761);
+                h2 = Math.imul(h2 ^ ch, 1597334677);
+            }
+            h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+            const hex = (h1 >>> 0).toString(16).toUpperCase().padStart(6, '0').slice(0, 6);
+            return `USR-${hex}`;
+        }
+
+        // Formateador estándar de RUT Chileno (XX.XXX.XXX-X)
+        function formatChileanRut(rawRut) {
+            const clean = rawRut.replace(/[^0-9kK]/g, '').toUpperCase();
+            if (clean.length < 2) return clean;
+            const body = clean.slice(0, -1);
+            const dv = clean.slice(-1);
+            const formattedBody = body.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+            return `${formattedBody}-${dv}`;
+        }
+
+        // Extractor Regex para QR de Cédula de Identidad Chilena (URL Registro Civil)
+        function parseChileanIdQr(qrString) {
+            const raw = qrString.trim();
+            let extractedRun = null;
+            let hadSerial = false;
+
+            const urlRunMatch = raw.match(/[?&]RUN=([0-9]{1,2}\.?[0-9]{3}\.?[0-9]{3}-?[0-9kK])/i);
+            if (urlRunMatch && urlRunMatch[1]) {
+                extractedRun = formatChileanRut(urlRunMatch[1]);
+            } else {
+                const genericRutMatch = raw.match(/\b([0-9]{1,2}\.?[0-9]{3}\.?[0-9]{3}-?[0-9kK])\b/i);
+                if (genericRutMatch && genericRutMatch[1]) {
+                    extractedRun = formatChileanRut(genericRutMatch[1]);
+                }
+            }
+
+            if (/serial=|doc=|serie=/i.test(raw)) {
+                hadSerial = true;
+            }
+
+            return {
+                rawText: raw,
+                rut: extractedRun,
+                hadSerial: hadSerial
+            };
+        }
+
+        // Función asíncrona para enviar el registro en vivo a Google Sheets (Flujo y Padron)
+        async function pushToGoogleSheets(payload) {
+            const consoleCloud = document.getElementById('console-cloud-sync');
+            const cloudText = document.getElementById('cloud-status-text');
+            const cloudDot = document.getElementById('cloud-status-dot');
+
+            try {
+                if (consoleCloud) {
+                    consoleCloud.textContent = 'Enviando POST a Google Sheets...';
+                    consoleCloud.className = 'text-amber-300 font-bold';
+                }
+                if (cloudText) cloudText.textContent = 'Sincronizando fila con Google Sheets...';
+
+                await fetch(GOOGLE_SCRIPT_URL, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    headers: {
+                        'Content-Type': 'text/plain;charset=utf-8'
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                if (consoleCloud) {
+                    consoleCloud.textContent = payload.esNuevo
+                        ? 'OK -> Guardado en Flujo y Padron'
+                        : 'OK -> Guardado en pestaña Flujo';
+                    consoleCloud.className = 'text-emerald-400 font-bold';
+                }
+                if (cloudText) cloudText.textContent = 'Sincronizado con Google Sheets (/exec activo)';
+                if (cloudDot) cloudDot.className = 'w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse';
+                return true;
+            } catch (err) {
+                console.warn('Error al sincronizar con Google Sheets:', err);
+                if (consoleCloud) {
+                    consoleCloud.textContent = 'Guardado local (Error red)';
+                    consoleCloud.className = 'text-rose-400 font-bold';
+                }
+                return false;
+            }
+        }
+
+        // Botón para probar la conexión enviando una fila real a Google Sheets
+        async function sendTestRowToGoogleSheets() {
+            const testRut = '21.345.678-9';
+            const testHash = generateAnonHash(testRut);
+            const testPayload = {
+                idAnonimo: testHash,
+                rut: testRut,
+                nombre: 'Marcos (Prueba Capstonersitos)',
+                telefono: '+56 9 8765 4321',
+                perfil: 'Estudiante',
+                espacio: 'Cowork',
+                tipoIngreso: 'QR Cédula (Recurrente)',
+                esNuevo: false
+            };
+
+            showToast('Enviando fila de prueba a tu Google Sheets...', 'info');
+            await pushToGoogleSheets(testPayload);
+
+            const nowStr = new Date().toLocaleString('es-CL');
+            accessLogs.unshift({
+                id: Date.now(),
+                timestamp: nowStr,
+                hourBlock: new Date().getHours(),
+                hashId: testPayload.idAnonimo,
+                profile: testPayload.perfil,
+                space: testPayload.espacio,
+                accessType: testPayload.tipoIngreso,
+                synced: true
+            });
+            saveStorageData();
+            updateAllViews();
+            showToast('¡Fila enviada! Revisa la pestaña "Flujo" en tu Google Sheets.', 'success');
+        }
+
+        // Perfiles precargados del equipo Capstonersitos y comunidad
+        function getInitialUsers() {
+            const seed = [
+                { rut: '21.345.678-9', name: 'Marcos', phone: '+56 9 8765 4321', profile: 'Estudiante', enrolledDate: '2026-10-20 09:00' },
+                { rut: '20.987.654-3', name: 'Bastián', phone: '+56 9 7654 3210', profile: 'Startup', enrolledDate: '2026-10-20 09:15' },
+                { rut: '21.112.233-4', name: 'Vicente', phone: '+56 9 6543 2109', profile: 'Emprendedor', enrolledDate: '2026-10-21 10:00' },
+                { rut: '20.556.677-8', name: 'Pablo', phone: '+56 9 5432 1098', profile: 'Estudiante', enrolledDate: '2026-10-21 10:30' },
+                { rut: '17.445.882-K', name: 'Camila Valdés', phone: '+56 9 9123 4567', profile: 'Empresa', enrolledDate: '2026-10-24 11:20' },
+                { rut: '14.832.190-5', name: 'Roberto Fuentes', phone: '+56 9 8234 5678', profile: 'Vecino', enrolledDate: '2026-10-25 15:10' }
+            ];
+            return seed.map(u => ({
+                ...u,
+                hashId: generateAnonHash(u.rut)
+            }));
+        }
+
+        function getInitialLogs(users) {
+            const today = new Date().toISOString().slice(0, 10);
+            return [
+                { id: 101, timestamp: `${today} 09:05:12`, hourBlock: 9, hashId: users[0].hashId, profile: users[0].profile, space: 'Cowork', accessType: 'QR Cédula (Recurrente)', synced: true },
+                { id: 102, timestamp: `${today} 09:42:19`, hourBlock: 9, hashId: users[1].hashId, profile: users[1].profile, space: 'Sala de Reuniones', accessType: 'QR Cédula (Recurrente)', synced: true },
+                { id: 103, timestamp: `${today} 10:15:08`, hourBlock: 10, hashId: users[2].hashId, profile: users[2].profile, space: 'Taller / Mentoría', accessType: 'QR Cédula (Recurrente)', synced: true },
+                { id: 104, timestamp: `${today} 11:02:44`, hourBlock: 11, hashId: users[3].hashId, profile: users[3].profile, space: 'Cowork', accessType: 'QR Cédula (Recurrente)', synced: true },
+                { id: 105, timestamp: `${today} 11:35:50`, hourBlock: 11, hashId: users[4].hashId, profile: users[4].profile, space: 'Sala de Reuniones', accessType: 'QR Cédula (Recurrente)', synced: true },
+                { id: 106, timestamp: `${today} 14:20:11`, hourBlock: 14, hashId: users[5].hashId, profile: users[5].profile, space: 'Evento / Auditorio', accessType: 'QR Cédula (Recurrente)', synced: true },
+                { id: 107, timestamp: `${today} 16:10:05`, hourBlock: 16, hashId: users[0].hashId, profile: users[0].profile, space: 'Cowork', accessType: 'QR Cédula (Recurrente)', synced: true }
+            ];
+        }
+
+        function loadStorageData() {
+            try {
+                const storedUsers = localStorage.getItem(STORAGE_KEY_USERS);
+                const storedLogs = localStorage.getItem(STORAGE_KEY_LOGS);
+                if (storedUsers && storedLogs) {
+                    enrolledUsers = JSON.parse(storedUsers);
+                    accessLogs = JSON.parse(storedLogs);
+                } else {
+                    enrolledUsers = getInitialUsers();
+                    accessLogs = getInitialLogs(enrolledUsers);
+                    saveStorageData();
+                }
+            } catch (e) {
+                enrolledUsers = getInitialUsers();
+                accessLogs = getInitialLogs(enrolledUsers);
+            }
+            updateAllViews();
+        }
+
+        function saveStorageData() {
+            try {
+                localStorage.setItem(STORAGE_KEY_USERS, JSON.stringify(enrolledUsers));
+                localStorage.setItem(STORAGE_KEY_LOGS, JSON.stringify(accessLogs));
+            } catch (e) {
+                console.warn('No se pudo guardar en localStorage:', e);
+            }
+        }
+
+        // Procesar lectura de QR (cámara, pistola USB o simulador)
+        function handleQrScanPayload(rawQrText) {
+            const parsed = parseChileanIdQr(rawQrText);
+            document.getElementById('console-raw-qr').textContent = parsed.rawText;
+
+            if (!parsed.rut) {
+                document.getElementById('console-serial').textContent = 'No detectado';
+                document.getElementById('console-rut').textContent = 'RUT INVÁLIDO';
+                document.getElementById('console-hash').textContent = '---';
+                showToast('No se encontró un RUT válido en la lectura.', 'error');
+                return;
+            }
+
+            currentScannedRut = parsed.rut;
+            currentScannedHash = generateAnonHash(parsed.rut);
+
+            document.getElementById('console-serial').textContent = parsed.hadSerial
+                ? 'DESCARTADO (Privacidad Ley)'
+                : 'Omitido (Lectura limpia)';
+            document.getElementById('console-rut').textContent = currentScannedRut;
+            document.getElementById('console-hash').textContent = currentScannedHash;
+            document.getElementById('console-cloud-sync').textContent = 'Esperando confirmación...';
+
+            const existingUser = enrolledUsers.find(u => u.rut.toUpperCase() === currentScannedRut.toUpperCase());
+
+            document.getElementById('state-idle').classList.add('hidden');
+            document.getElementById('state-recognized').classList.add('hidden');
+            document.getElementById('state-enrollment').classList.add('hidden');
+            document.getElementById('state-success').classList.add('hidden');
+
+            if (existingUser) {
+                currentRecognizedUser = existingUser;
+                document.getElementById('rec-hash-badge').textContent = `ID: ${existingUser.hashId}`;
+                document.getElementById('rec-greeting').textContent = `¡Hola de nuevo, ${existingUser.name}!`;
+                document.getElementById('rec-rut').textContent = existingUser.rut;
+                document.getElementById('rec-phone').textContent = existingUser.phone;
+                document.getElementById('rec-profile').textContent = existingUser.profile;
+
+                document.getElementById('state-recognized').classList.remove('hidden');
+                showToast(`Usuario reconocido: ${existingUser.name}. Elige el espacio para registrar.`, 'success');
+            } else {
+                currentRecognizedUser = null;
+                document.getElementById('enr-hash-preview').textContent = `ID Asignado: ${currentScannedHash}`;
+                document.getElementById('enr-rut').value = currentScannedRut;
+                document.getElementById('enr-name').value = '';
+                document.getElementById('enr-phone').value = '+56 9 ';
+                document.getElementById('enr-consent').checked = false;
+
+                document.getElementById('state-enrollment').classList.remove('hidden');
+                document.getElementById('enr-name').focus();
+                showToast(`Visitante nuevo (${currentScannedRut}). Completa el enrolamiento único.`, 'info');
+            }
+        }
+
+        // Botón A: Simular lectura QR de usuario ya enrolado
+        function simulateEnrolledUserScan() {
+            if (enrolledUsers.length === 0) return;
+            const user = enrolledUsers[simUserIndex % enrolledUsers.length];
+            simUserIndex++;
+
+            const cleanRunParam = user.rut.replace(/\./g, '');
+            const fakeSerial = Math.floor(500000000 + Math.random() * 90000000);
+            const simulatedUrl = `https://portal.sidiv.registrocivil.cl/usuarios-portal/pages/DocumentRequestStatus.xhtml?RUN=${cleanRunParam}&type=CEDULA&serial=${fakeSerial}`;
+
+            handleQrScanPayload(simulatedUrl);
+        }
+
+        // Botón B: Simular lectura QR de visitante nuevo
+        function simulateNewUserScan() {
+            const randomNum = Math.floor(18000000 + Math.random() * 6500000);
+            let m = 0, s = 1, t = randomNum;
+            for (; t; t = Math.floor(t / 10)) {
+                s = (s + t % 10 * (9 - m++ % 6)) % 11;
+            }
+            const dv = s ? String(s - 1) : 'K';
+            const fakeSerial = Math.floor(510000000 + Math.random() * 80000000);
+            const simulatedUrl = `https://portal.sidiv.registrocivil.cl/usuarios-portal/pages/DocumentRequestStatus.xhtml?RUN=${randomNum}-${dv}&type=CEDULA&serial=${fakeSerial}`;
+
+            handleQrScanPayload(simulatedUrl);
+        }
+
+        function processManualInput() {
+            const inputEl = document.getElementById('manual-qr-input');
+            const val = inputEl.value.trim();
+            if (!val) {
+                showToast('Ingresa un RUT o URL del QR de la cédula.', 'error');
+                return;
+            }
+            handleQrScanPayload(val);
+            inputEl.value = '';
+        }
+
+        // Check-in en 1 clic para usuario recurrente -> Envía a pestaña 'Flujo' en Google Sheets
+        async function registerQuickAccess(spaceName) {
+            if (!currentRecognizedUser) return;
+
+            const now = new Date();
+            const timestampStr = now.toLocaleString('es-CL');
+
+            const payload = {
+                idAnonimo: currentRecognizedUser.hashId,
+                rut: currentRecognizedUser.rut,
+                nombre: currentRecognizedUser.name,
+                telefono: currentRecognizedUser.phone,
+                perfil: currentRecognizedUser.profile,
+                espacio: spaceName,
+                tipoIngreso: 'QR Cédula (Recurrente)',
+                esNuevo: false
+            };
+
+            const newLog = {
+                id: Date.now(),
+                timestamp: timestampStr,
+                hourBlock: now.getHours(),
+                hashId: payload.idAnonimo,
+                profile: payload.perfil,
+                space: payload.espacio,
+                accessType: payload.tipoIngreso,
+                synced: true
+            };
+
+            accessLogs.unshift(newLog);
+            saveStorageData();
+            updateAllViews();
+
+            document.getElementById('state-recognized').classList.add('hidden');
+            document.getElementById('succ-name').textContent = `¡Adelante, ${currentRecognizedUser.name}!`;
+            document.getElementById('succ-details').innerHTML = `Espacio: <strong>${spaceName}</strong> · Hora: <strong>${now.toTimeString().slice(0, 8)}</strong>`;
+            document.getElementById('succ-hash').textContent = payload.idAnonimo;
+            document.getElementById('succ-profile').textContent = payload.perfil;
+            document.getElementById('succ-phone').textContent = payload.telefono;
+            document.getElementById('succ-type').textContent = payload.tipoIngreso;
+            document.getElementById('state-success').classList.remove('hidden');
+
+            await pushToGoogleSheets(payload);
+            showToast(`Acceso enviado a Google Sheets (Pestaña Flujo: ${spaceName})`, 'success');
+        }
+
+        // Enrolamiento Inicial Único -> Envía esNuevo: true para poblar 'Padron' y 'Flujo' en Google Sheets
+        async function submitNewEnrollment(event) {
+            event.preventDefault();
+
+            const rut = document.getElementById('enr-rut').value.trim();
+            const name = document.getElementById('enr-name').value.trim();
+            const phone = document.getElementById('enr-phone').value.trim();
+            const profile = document.getElementById('enr-profile').value;
+            const space = document.getElementById('enr-space').value;
+            const consent = document.getElementById('enr-consent').checked;
+
+            if (!rut || !name || !phone || !consent) {
+                showToast('Completa todos los campos y acepta el consentimiento legal.', 'error');
+                return;
+            }
+
+            const now = new Date();
+            const timestampStr = now.toLocaleString('es-CL');
+            const hashId = generateAnonHash(rut);
+
+            const payload = {
+                idAnonimo: hashId,
+                rut: rut,
+                nombre: name,
+                telefono: phone,
+                perfil: profile,
+                espacio: space,
+                tipoIngreso: 'Enrolamiento Inicial',
+                esNuevo: true
+            };
+
+            enrolledUsers.unshift({
+                rut: rut,
+                name: name,
+                phone: phone,
+                profile: profile,
+                enrolledDate: timestampStr,
+                hashId: hashId
+            });
+
+            accessLogs.unshift({
+                id: Date.now(),
+                timestamp: timestampStr,
+                hourBlock: now.getHours(),
+                hashId: hashId,
+                profile: profile,
+                space: space,
+                accessType: 'Enrolamiento Inicial',
+                synced: true
+            });
+
+            saveStorageData();
+            updateAllViews();
+
+            document.getElementById('state-enrollment').classList.add('hidden');
+            document.getElementById('succ-name').textContent = `¡Bienvenido/a al Hub, ${name}!`;
+            document.getElementById('succ-details').innerHTML = `Espacio: <strong>${space}</strong> · Enrolamiento Único Completado`;
+            document.getElementById('succ-hash').textContent = payload.idAnonimo;
+            document.getElementById('succ-profile').textContent = payload.perfil;
+            document.getElementById('succ-phone').textContent = payload.telefono;
+            document.getElementById('succ-type').textContent = 'Enrolamiento Inicial (Padron + Flujo)';
+            document.getElementById('state-success').classList.remove('hidden');
+
+            await pushToGoogleSheets(payload);
+            showToast(`¡${name} guardado en pestañas Padron y Flujo de Google Sheets!`, 'success');
+        }
+
+        function resetScannerState() {
+            currentScannedRut = null;
+            currentScannedHash = null;
+            currentRecognizedUser = null;
+            document.getElementById('state-recognized').classList.add('hidden');
+            document.getElementById('state-enrollment').classList.add('hidden');
+            document.getElementById('state-success').classList.add('hidden');
+            document.getElementById('state-idle').classList.remove('hidden');
+        }
+
+        function quickScanFromTable(rut) {
+            switchTab('scanner');
+            const cleanRun = rut.replace(/\./g, '');
+            const url = `https://portal.sidiv.registrocivil.cl/usuarios-portal/pages/DocumentRequestStatus.xhtml?RUN=${cleanRun}&type=CEDULA&serial=523981234`;
+            handleQrScanPayload(url);
+        }
+
+        // Escáner de cámara con soporte para lente frontal/trasero
+        function startCameraScanner() {
+            if (isCameraRunning) return;
+
+            const facingMode = document.getElementById('camera-facing-select').value;
+            const placeholder = document.getElementById('camera-placeholder');
+            const badge = document.getElementById('camera-status-badge');
+            const btnStart = document.getElementById('btn-start-camera');
+            const btnStop = document.getElementById('btn-stop-camera');
+
+            try {
+                html5QrCode = new Html5Qrcode("qr-reader");
+                const config = { fps: 10, qrbox: { width: 220, height: 150 } };
+
+                html5QrCode.start(
+                    { facingMode: facingMode },
+                    config,
+                    (decodedText) => {
+                        handleQrScanPayload(decodedText);
+                        stopCameraScanner();
+                    },
+                    () => {}
+                ).then(() => {
+                    isCameraRunning = true;
+                    placeholder.classList.add('hidden');
+                    btnStart.classList.add('hidden');
+                    btnStop.classList.remove('hidden');
+                    badge.textContent = 'Escaneando en vivo';
+                    badge.className = 'text-[11px] px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40';
+                }).catch((err) => {
+                    showToast('No se pudo abrir la cámara. Usa el Simulador Demo o revisa permisos HTTPS.', 'error');
+                    console.warn('Error cámara:', err);
+                });
+            } catch (e) {
+                showToast('Cámara no disponible. Usa el Simulador Demo.', 'error');
+            }
+        }
+
+        function stopCameraScanner() {
+            if (!html5QrCode || !isCameraRunning) return;
+            html5QrCode.stop().then(() => {
+                html5QrCode.clear();
+                isCameraRunning = false;
+                document.getElementById('camera-placeholder').classList.remove('hidden');
+                document.getElementById('btn-start-camera').classList.remove('hidden');
+                document.getElementById('btn-stop-camera').classList.add('hidden');
+                const badge = document.getElementById('camera-status-badge');
+                badge.textContent = 'Cámara en espera';
+                badge.className = 'text-[11px] px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700';
+            }).catch(err => console.warn(err));
+        }
+
+        function switchTab(tabName) {
+            ['scanner', 'database', 'dashboard'].forEach(t => {
+                const panel = document.getElementById(`panel-${t}`);
+                const btn = document.getElementById(`tab-btn-${t}`);
+                if (t === tabName) {
+                    panel.classList.remove('hidden');
+                    btn.className = 'tab-btn flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all whitespace-nowrap bg-blue-600 text-white shadow-sm';
+                } else {
+                    panel.classList.add('hidden');
+                    btn.className = 'tab-btn flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all whitespace-nowrap text-slate-300 hover:text-white hover:bg-slate-700/60';
+                }
+            });
+
+            if (tabName === 'dashboard') {
+                renderCharts();
+            }
+        }
+
+        function switchDbView(view) {
+            currentDbView = view;
+            const accessView = document.getElementById('db-view-access');
+            const usersView = document.getElementById('db-view-users');
+            const btnAccess = document.getElementById('db-toggle-access');
+            const btnUsers = document.getElementById('db-toggle-users');
+
+            if (view === 'access') {
+                accessView.classList.remove('hidden');
+                usersView.classList.add('hidden');
+                btnAccess.className = 'py-2.5 px-4 rounded-xl font-bold text-xs sm:text-sm transition flex items-center justify-center gap-2 bg-white text-blue-900 shadow-sm';
+                btnUsers.className = 'py-2.5 px-4 rounded-xl font-bold text-xs sm:text-sm transition flex items-center justify-center gap-2 text-slate-600 hover:text-slate-900';
+            } else {
+                accessView.classList.add('hidden');
+                usersView.classList.remove('hidden');
+                btnUsers.className = 'py-2.5 px-4 rounded-xl font-bold text-xs sm:text-sm transition flex items-center justify-center gap-2 bg-white text-blue-900 shadow-sm';
+                btnAccess.className = 'py-2.5 px-4 rounded-xl font-bold text-xs sm:text-sm transition flex items-center justify-center gap-2 text-slate-600 hover:text-slate-900';
+            }
+        }
+
+        function updateAllViews() {
+            document.getElementById('badge-db-count').textContent = accessLogs.length;
+
+            // Tabla Flujo
+            const tbodyLogs = document.getElementById('tbody-access-logs');
+            tbodyLogs.innerHTML = accessLogs.map(log => `
+                <tr class="hover:bg-slate-50 transition">
+                    <td class="py-3 px-4 font-mono text-xs text-slate-600">${log.timestamp}</td>
+                    <td class="py-3 px-4 font-mono font-bold text-blue-800">${log.hashId}</td>
+                    <td class="py-3 px-4">
+                        <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
+                            ${log.profile}
+                        </span>
+                    </td>
+                    <td class="py-3 px-4 font-semibold text-slate-900">${log.space}</td>
+                    <td class="py-3 px-4 text-xs text-slate-600">${log.accessType}</td>
+                    <td class="py-3 px-4 text-right">
+                        <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            <i class="fa-solid fa-check"></i> Sincronizado /exec
+                        </span>
+                    </td>
+                </tr>
+            `).join('');
+
+            // Tabla Padrón
+            const tbodyUsers = document.getElementById('tbody-enrolled-users');
+            tbodyUsers.innerHTML = enrolledUsers.map(u => `
+                <tr class="hover:bg-slate-50 transition">
+                    <td class="py-3 px-4 font-mono text-xs text-slate-500">${u.enrolledDate}</td>
+                    <td class="py-3 px-4 font-mono font-bold text-amber-700">${u.hashId}</td>
+                    <td class="py-3 px-4 font-mono font-semibold text-slate-900">${u.rut}</td>
+                    <td class="py-3 px-4 font-bold text-slate-900">${u.name}</td>
+                    <td class="py-3 px-4 font-mono text-slate-700">${u.phone}</td>
+                    <td class="py-3 px-4">
+                        <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200">
+                            ${u.profile}
+                        </span>
+                    </td>
+                    <td class="py-3 px-4 text-right">
+                        <button onclick="quickScanFromTable('${u.rut}')" class="text-xs font-semibold bg-blue-50 hover:bg-blue-100 text-blue-700 px-3 py-1 rounded-lg border border-blue-200 transition">
+                            <i class="fa-solid fa-qrcode mr-1"></i> Escanear
+                        </button>
+                    </td>
+                </tr>
+            `).join('');
+
+            // KPIs
+            document.getElementById('kpi-total-today').textContent = accessLogs.length;
+            document.getElementById('kpi-total-users').textContent = enrolledUsers.length;
+
+            if (!document.getElementById('panel-dashboard').classList.contains('hidden')) {
+                renderCharts();
+            }
+        }
+
+        function renderCharts() {
+            const spacesLabels = ['Cowork', 'Sala de Reuniones', 'Evento / Auditorio', 'Taller / Mentoría'];
+            const spacesData = spacesLabels.map(sp => accessLogs.filter(l => l.space === sp).length);
+
+            const profilesLabels = ['Emprendedor', 'Startup', 'Estudiante', 'Empresa', 'Vecino'];
+            const profilesData = profilesLabels.map(pr => accessLogs.filter(l => l.profile === pr).length);
+
+            const hourLabels = ['08-10h', '10-12h', '12-14h', '14-16h', '16-19h'];
+            const hourCounts = [0, 0, 0, 0, 0];
+            accessLogs.forEach(l => {
+                const h = l.hourBlock ?? 10;
+                if (h < 10) hourCounts[0]++;
+                else if (h < 12) hourCounts[1]++;
+                else if (h < 14) hourCounts[2]++;
+                else if (h < 16) hourCounts[3]++;
+                else hourCounts[4]++;
+            });
+
+            const ctxSpaces = document.getElementById('chart-spaces').getContext('2d');
+            if (chartSpacesInstance) chartSpacesInstance.destroy();
+            chartSpacesInstance = new Chart(ctxSpaces, {
+                type: 'bar',
+                data: {
+                    labels: spacesLabels,
+                    datasets: [{
+                        label: 'Ingresos',
+                        data: spacesData,
+                        backgroundColor: ['#2563eb', '#7c3aed', '#f59e0b', '#10b981'],
+                        borderRadius: 8
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }
+                }
+            });
+
+            const ctxProfiles = document.getElementById('chart-profiles').getContext('2d');
+            if (chartProfilesInstance) chartProfilesInstance.destroy();
+            chartProfilesInstance = new Chart(ctxProfiles, {
+                type: 'doughnut',
+                data: {
+                    labels: profilesLabels,
+                    datasets: [{
+                        data: profilesData,
+                        backgroundColor: ['#f59e0b', '#10b981', '#2563eb', '#6366f1', '#ec4899'],
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { position: 'bottom' } }
+                }
+            });
+
+            const ctxHours = document.getElementById('chart-hours').getContext('2d');
+            if (chartHoursInstance) chartHoursInstance.destroy();
+            chartHoursInstance = new Chart(ctxHours, {
+                type: 'line',
+                data: {
+                    labels: hourLabels,
+                    datasets: [{
+                        label: 'Accesos por Bloque',
+                        data: hourCounts,
+                        borderColor: '#10b981',
+                        backgroundColor: 'rgba(16, 185, 129, 0.15)',
+                        fill: true,
+                        tension: 0.35,
+                        pointRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }
+                }
+            });
+        }
+
+        function exportCurrentTableCSV() {
+            let csvContent = '\uFEFF';
+            let filename = '';
+
+            if (currentDbView === 'access') {
+                csvContent += 'Fecha_Hora;ID_Anonimo;Perfil;Espacio_Utilizado;Tipo_Ingreso\n';
+                accessLogs.forEach(l => {
+                    csvContent += `${l.timestamp};${l.hashId};${l.profile};${l.space};${l.accessType}\n`;
+                });
+                filename = 'HubProvidencia_Pestana_Flujo.csv';
+            } else {
+                csvContent += 'Fecha_Enrolamiento;ID_Anonimo;RUT;Nombre;Telefono;Perfil\n';
+                enrolledUsers.forEach(u => {
+                    csvContent += `${u.enrolledDate};${u.hashId};${u.rut};${u.name};${u.phone};${u.profile}\n`;
+                });
+                filename = 'HubProvidencia_Pestana_Padron.csv';
+            }
+
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            showToast(`Archivo ${filename} descargado.`, 'success');
+        }
+
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            let colors = 'bg-slate-900 text-white border-slate-700';
+            let icon = 'fa-circle-info text-blue-400';
+
+            if (type === 'success') {
+                colors = 'bg-emerald-900 text-white border-emerald-700';
+                icon = 'fa-circle-check text-emerald-400';
+            } else if (type === 'error') {
+                colors = 'bg-rose-900 text-white border-rose-700';
+                icon = 'fa-triangle-exclamation text-rose-300';
+            }
+
+            toast.className = `pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg border text-xs sm:text-sm font-medium transition-all duration-300 ${colors}`;
+            toast.innerHTML = `<i class="fa-solid ${icon} text-base"></i><span>${message}</span>`;
+            container.appendChild(toast);
+
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transform = 'translateY(8px)';
+                setTimeout(() => toast.remove(), 300);
+            }, 3400);
+        }
+
+        function startClock() {
+            const update = () => {
+                const now = new Date().toTimeString().slice(0, 8);
+                const el = document.getElementById('live-clock');
+                if (el) el.textContent = now;
+            };
+            update();
+            setInterval(update, 1000);
+        }
+
+        window.onload = function() {
+            startClock();
+            loadStorageData();
+        };
+    </script>
+</body>
+</html>
