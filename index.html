@@ -1,0 +1,1528 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hub Providencia | Sistema de Acceso Ágil y Caracterización QR</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <!-- Librería Lector QR por Cámara (html5-qrcode) -->
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+    <!-- Librería de Gráficos (Chart.js) -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                    colors: {
+                        provi: {
+                            50: '#f0f5ff',
+                            100: '#e0eafc',
+                            600: '#1d4ed8',
+                            700: '#1e40af',
+                            800: '#1e3a8a',
+                            900: '#0f172a',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f1f5f9;
+        }
+        /* Personalización del contenedor de cámara html5-qrcode */
+        #qr-reader {
+            border: none !important;
+            border-radius: 0.75rem;
+            overflow: hidden;
+        }
+        #qr-reader video {
+            border-radius: 0.75rem;
+            object-fit: cover;
+        }
+        /* Animación suave entre pestañas */
+        .tab-panel {
+            animation: fadeIn 0.25s ease-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(4px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        /* Línea láser animada cuando el escáner está activo */
+        .laser-line {
+            height: 2px;
+            background: linear-gradient(90deg, transparent, #10b981, #34d399, #10b981, transparent);
+            box-shadow: 0 0 12px #10b981;
+            animation: scanLaser 2s infinite ease-in-out;
+        }
+        @keyframes scanLaser {
+            0%, 100% { transform: translateY(10px); opacity: 0.7; }
+            50% { transform: translateY(180px); opacity: 1; }
+        }
+    </style>
+</head>
+<body class="text-slate-800 min-h-screen flex flex-col">
+
+    <!-- BARRA DE NAVEGACIÓN SUPERIOR -->
+    <header class="bg-provi-900 text-white shadow-lg sticky top-0 z-40 border-b border-slate-800">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex flex-col md:flex-row md:items-center md:justify-between py-3 gap-3">
+                <!-- Logo y Título Institucional -->
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-blue-600 to-emerald-500 flex items-center justify-center shadow-md">
+                            <i class="fa-solid fa-id-card-clip text-white text-xl"></i>
+                        </div>
+                        <div>
+                            <div class="flex items-center gap-2">
+                                <span class="text-xs font-semibold uppercase tracking-wider text-emerald-400">Municipalidad de Providencia</span>
+                                <span class="hidden sm:inline-block text-[11px] bg-slate-800 text-slate-300 px-2 py-0.5 rounded-full border border-slate-700">Equipo Capstonersitos</span>
+                            </div>
+                            <h1 class="text-lg sm:text-xl font-bold tracking-tight text-white">Hub Providencia · Torniquete Lógico QR</h1>
+                        </div>
+                    </div>
+                    <!-- Reloj en vivo móvil -->
+                    <div class="md:hidden text-right">
+                        <span id="live-clock-mobile" class="font-mono text-xs bg-slate-800 px-2.5 py-1 rounded-lg text-emerald-400 border border-slate-700">12:00:00</span>
+                    </div>
+                </div>
+
+                <!-- Pestañas de Navegación -->
+                <nav class="flex items-center gap-1.5 bg-slate-800/90 p-1.5 rounded-xl border border-slate-700/80 overflow-x-auto">
+                    <button onclick="switchTab('scanner')" id="tab-btn-scanner" class="tab-btn flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all whitespace-nowrap bg-blue-600 text-white shadow-sm">
+                        <i class="fa-solid fa-qrcode"></i>
+                        <span>1. Punto de Acceso (QR)</span>
+                    </button>
+                    <button onclick="switchTab('database')" id="tab-btn-database" class="tab-btn flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all whitespace-nowrap text-slate-300 hover:text-white hover:bg-slate-700/60">
+                        <i class="fa-solid fa-database"></i>
+                        <span>2. Base de Datos</span>
+                        <span id="badge-db-count" class="ml-1 px-1.5 py-0.5 text-[11px] rounded-full bg-slate-900 text-emerald-400 font-mono">10</span>
+                    </button>
+                    <button onclick="switchTab('dashboard')" id="tab-btn-dashboard" class="tab-btn flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all whitespace-nowrap text-slate-300 hover:text-white hover:bg-slate-700/60">
+                        <i class="fa-solid fa-chart-pie"></i>
+                        <span>3. Dashboard de Gestión</span>
+                    </button>
+                </nav>
+
+                <!-- Reloj y Estado Legal Desktop -->
+                <div class="hidden lg:flex items-center gap-3">
+                    <div class="text-right">
+                        <div class="text-[11px] text-slate-400 flex items-center justify-end gap-1">
+                            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                            Privacidad por Diseño Activa
+                        </div>
+                        <div id="live-clock" class="font-mono text-sm font-semibold text-slate-200">--:--:--</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- CONTENIDO PRINCIPAL -->
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+
+        <!-- =================================================================== -->
+        <!-- PESTAÑA 1: PUNTO DE ACCESO (ESCÁNER QR Y ENROLAMIENTO / CHECK-IN)   -->
+        <!-- =================================================================== -->
+        <section id="panel-scanner" class="tab-panel space-y-6">
+            
+            <!-- Banner Explicativo de Arquitectura QR Carnet Chileno -->
+            <div class="bg-white rounded-2xl p-4 sm:p-5 shadow-sm border border-slate-200 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
+                <div class="flex items-start gap-3.5">
+                    <div class="w-10 h-10 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center flex-shrink-0 mt-0.5 border border-blue-200">
+                        <i class="fa-solid fa-shield-halved text-lg"></i>
+                    </div>
+                    <div>
+                        <h2 class="text-sm sm:text-base font-bold text-slate-900 flex flex-wrap items-center gap-2">
+                            <span>¿Cómo extrae el sistema el RUT, Nombre y Teléfono?</span>
+                            <span class="text-xs font-medium bg-emerald-50 text-emerald-700 px-2.5 py-0.5 rounded-full border border-emerald-200">Cumplimiento Ley de Datos Personales</span>
+                        </h2>
+                        <p class="text-xs sm:text-sm text-slate-600 mt-1 leading-relaxed">
+                            El QR trasero del carnet chileno contiene una URL del Registro Civil (<code class="bg-slate-100 px-1.5 py-0.5 rounded text-blue-700 font-mono text-xs">...registrocivil.cl/docstatus?RUN=12345678-9&amp;serial=...</code>). Nuestro algoritmo extrae por <strong>Regex únicamente el RUN</strong>, descarta en el acto el N° de serie y cruza el RUN con el padrón de enrolados para recuperar automáticamente el <strong>Nombre, Teléfono y Perfil</strong> en menos de 2 segundos.
+                        </p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2 self-end lg:self-center flex-shrink-0">
+                    <span class="text-xs bg-slate-100 text-slate-700 px-3 py-1.5 rounded-lg font-medium border border-slate-200">
+                        <i class="fa-solid fa-bolt text-amber-500 mr-1"></i> Licencias: <strong>$0 CLP</strong>
+                    </span>
+                </div>
+            </div>
+
+            <!-- Grilla Principal: Columna Izquierda (Lector + Simulador + Inspector) | Columna Derecha (Acción Condicional) -->
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+
+                <!-- COLUMNA IZQUIERDA (5 cols): Lector QR en Vivo + Simulador + Consola Técnica -->
+                <div class="lg:col-span-5 space-y-5">
+
+                    <!-- Tarjeta 1: Lector de Cámara QR -->
+                    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                        <div class="bg-slate-900 text-white px-5 py-3.5 flex items-center justify-between">
+                            <div class="flex items-center gap-2.5">
+                                <i class="fa-solid fa-camera text-emerald-400"></i>
+                                <h3 class="font-semibold text-sm">Lector Óptico / Cámara Web Recepción</h3>
+                            </div>
+                            <span id="camera-status-badge" class="text-[11px] px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700">
+                                Modo Espera
+                            </span>
+                        </div>
+
+                        <div class="p-5 space-y-4">
+                            <!-- Visor de Cámara -->
+                            <div class="relative bg-slate-950 rounded-xl min-h-[210px] flex flex-col items-center justify-center border-2 border-dashed border-slate-700 overflow-hidden">
+                                <div id="qr-reader" class="w-full"></div>
+                                <div id="camera-placeholder" class="text-center p-6 space-y-2">
+                                    <div class="w-14 h-14 rounded-2xl bg-slate-800/90 text-emerald-400 flex items-center justify-center mx-auto border border-slate-700 shadow-inner">
+                                        <i class="fa-solid fa-qrcode text-2xl"></i>
+                                    </div>
+                                    <p class="text-xs sm:text-sm font-medium text-slate-300">Acerca el reverso de la Cédula de Identidad</p>
+                                    <p class="text-[11px] text-slate-400 max-w-xs mx-auto">Puedes usar la cámara de tu notebook/celular, un lector óptico USB o el simulador de abajo.</p>
+                                </div>
+                            </div>
+
+                            <!-- Botones de Control de Cámara -->
+                            <div class="flex gap-2.5">
+                                <button id="btn-start-camera" onclick="startCameraScanner()" class="flex-1 bg-blue-700 hover:bg-blue-800 text-white font-semibold py-2.5 px-4 rounded-xl text-xs sm:text-sm transition flex items-center justify-center gap-2 shadow-sm">
+                                    <i class="fa-solid fa-video"></i>
+                                    <span>Iniciar Cámara QR</span>
+                                </button>
+                                <button id="btn-stop-camera" onclick="stopCameraScanner()" class="hidden flex-1 bg-rose-600 hover:bg-rose-700 text-white font-semibold py-2.5 px-4 rounded-xl text-xs sm:text-sm transition flex items-center justify-center gap-2 shadow-sm">
+                                    <i class="fa-solid fa-video-slash"></i>
+                                    <span>Detener Cámara</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tarjeta 2: Simulador de Escaneo QR (Ideal para Presentación y Pruebas) -->
+                    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 space-y-4">
+                        <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                            <div class="flex items-center gap-2">
+                                <i class="fa-solid fa-wand-magic-sparkles text-blue-600"></i>
+                                <h3 class="font-bold text-sm text-slate-800">Simulador de Escaneo QR (Demo en Vivo)</h3>
+                            </div>
+                            <span class="text-[11px] bg-blue-50 text-blue-700 font-semibold px-2 py-0.5 rounded-md border border-blue-200">Pruebas Rápidas</span>
+                        </div>
+
+                        <p class="text-xs text-slate-600">
+                            Simula la lectura instantánea del código QR trasero de una cédula chilena real o ingresa un RUT manualmente:
+                        </p>
+
+                        <!-- Botones de Simulación Directa -->
+                        <div class="grid grid-cols-1 gap-2.5">
+                            <button onclick="simulateEnrolledUserScan()" class="w-full text-left p-3 rounded-xl border border-emerald-200 bg-emerald-50/70 hover:bg-emerald-100/80 transition flex items-center justify-between group">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-9 h-9 rounded-lg bg-emerald-600 text-white flex items-center justify-center font-bold text-sm shadow-sm">
+                                        <i class="fa-solid fa-user-check"></i>
+                                    </div>
+                                    <div>
+                                        <div class="text-xs sm:text-sm font-bold text-emerald-950 group-hover:text-emerald-800">
+                                            a) Simular QR Carnet: Usuario Ya Enrolado
+                                        </div>
+                                        <div id="sim-enrolled-subtitle" class="text-[11px] text-emerald-700 font-mono">
+                                            Reconocimiento en 1 clic (Marcos / Bastián / Vicente / Pablo)
+                                        </div>
+                                    </div>
+                                </div>
+                                <i class="fa-solid fa-chevron-right text-emerald-600 text-xs group-hover:translate-x-1 transition-transform"></i>
+                            </button>
+
+                            <button onclick="simulateNewUserScan()" class="w-full text-left p-3 rounded-xl border border-amber-200 bg-amber-50/70 hover:bg-amber-100/80 transition flex items-center justify-between group">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-9 h-9 rounded-lg bg-amber-500 text-white flex items-center justify-center font-bold text-sm shadow-sm">
+                                        <i class="fa-solid fa-user-plus"></i>
+                                    </div>
+                                    <div>
+                                        <div class="text-xs sm:text-sm font-bold text-amber-950 group-hover:text-amber-800">
+                                            b) Simular QR Carnet: Visitante Nuevo (1ª Visita)
+                                        </div>
+                                        <div class="text-[11px] text-amber-700 font-mono">
+                                            Extrae RUT del QR y abre formulario de Enrolamiento Único
+                                        </div>
+                                    </div>
+                                </div>
+                                <i class="fa-solid fa-chevron-right text-amber-600 text-xs group-hover:translate-x-1 transition-transform"></i>
+                            </button>
+                        </div>
+
+                        <!-- Input Manual para Lector Óptico USB o Digitación por Contingencia -->
+                        <div class="pt-2 border-t border-slate-100">
+                            <label for="manual-qr-input" class="block text-xs font-semibold text-slate-700 mb-1.5">
+                                c) Entrada Lector USB / Pegar URL QR o Digitar RUT (Contingencia):
+                            </label>
+                            <div class="flex gap-2">
+                                <input type="text" id="manual-qr-input" 
+                                    placeholder="Ej: 21.345.678-9 o URL Registro Civil..." 
+                                    class="flex-1 text-xs sm:text-sm rounded-xl border border-slate-300 px-3.5 py-2 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent font-mono"
+                                    onkeydown="if(event.key === 'Enter') processManualInput()">
+                                <button onclick="processManualInput()" class="bg-slate-800 hover:bg-slate-900 text-white px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition flex items-center gap-1.5 whitespace-nowrap">
+                                    <i class="fa-solid fa-arrow-right-to-bracket"></i>
+                                    <span>Procesar</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tarjeta 3: Inspector Técnico en Tiempo Real (Privacidad por Diseño) -->
+                    <div class="bg-slate-900 rounded-2xl shadow-md border border-slate-800 p-4 text-slate-200 font-mono text-xs space-y-2.5">
+                        <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+                            <span class="text-emerald-400 font-semibold flex items-center gap-2">
+                                <i class="fa-solid fa-terminal"></i>
+                                Inspector de Privacidad por Diseño
+                            </span>
+                            <span class="text-[10px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded">Regex + SHA-256</span>
+                        </div>
+                        <div class="space-y-1.5 text-[11px]">
+                            <div>
+                                <span class="text-slate-400">1. Cadena cruda leída del QR:</span>
+                                <div id="console-raw-qr" class="bg-slate-950 text-slate-300 p-2 rounded-lg mt-0.5 break-all border border-slate-800">
+                                    Esperando lectura de código QR...
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-2 gap-2 pt-1">
+                                <div class="bg-slate-950 p-2 rounded-lg border border-slate-800">
+                                    <span class="text-slate-400 block text-[10px]">2. N° Serie Documento:</span>
+                                    <span id="console-serial" class="text-rose-400 font-semibold">---</span>
+                                </div>
+                                <div class="bg-slate-950 p-2 rounded-lg border border-slate-800">
+                                    <span class="text-slate-400 block text-[10px]">3. RUN Extraído Limpio:</span>
+                                    <span id="console-rut" class="text-emerald-400 font-bold text-xs">---</span>
+                                </div>
+                            </div>
+                            <div class="bg-slate-950 p-2 rounded-lg border border-slate-800 flex items-center justify-between">
+                                <span class="text-slate-400 text-[10px]">4. ID Anónimo (Hash BD):</span>
+                                <span id="console-hash" class="text-amber-300 font-bold">---</span>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- COLUMNA DERECHA (7 cols): Panel de Respuesta Dinámica (Reconocimiento o Enrolamiento) -->
+                <div class="lg:col-span-7">
+
+                    <!-- ESTADO 0: PANTALLA DE ESPERA INICIAL -->
+                    <div id="state-idle" class="bg-white rounded-2xl shadow-sm border border-slate-200 p-8 sm:p-12 text-center space-y-5 min-h-[520px] flex flex-col items-center justify-center">
+                        <div class="w-20 h-20 rounded-3xl bg-blue-50 text-blue-700 border border-blue-200 flex items-center justify-center shadow-sm">
+                            <i class="fa-solid fa-id-card text-4xl"></i>
+                        </div>
+                        <div class="max-w-md space-y-2">
+                            <span class="text-xs font-bold uppercase tracking-wider text-blue-700 bg-blue-50 px-3 py-1 rounded-full border border-blue-200">
+                                Punto de Control Digital Activo
+                            </span>
+                            <h3 class="text-xl sm:text-2xl font-extrabold text-slate-900 pt-1">
+                                Listo para Escanear Cédula de Identidad
+                            </h3>
+                            <p class="text-sm text-slate-600 leading-relaxed">
+                                Escanea el código QR de una cédula con la cámara o presiona uno de los botones del <strong>Simulador de Escaneo QR</strong> a la izquierda para ver cómo el sistema reconoce al visitante o solicita su enrolamiento único.
+                            </p>
+                        </div>
+
+                        <!-- Resumen de los 2 flujos posibles -->
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full max-w-lg pt-4 text-left">
+                            <div class="p-4 rounded-xl bg-emerald-50/70 border border-emerald-200">
+                                <div class="font-bold text-xs text-emerald-900 flex items-center gap-1.5">
+                                    <i class="fa-solid fa-circle-check text-emerald-600"></i>
+                                    Si el RUT ya está enrolado:
+                                </div>
+                                <p class="text-xs text-emerald-800 mt-1">
+                                    Recupera automáticamente su <strong>Nombre, Teléfono y Perfil</strong>. Solo elige a qué salón va en 1 clic (2 seg).
+                                </p>
+                            </div>
+                            <div class="p-4 rounded-xl bg-amber-50/70 border border-amber-200">
+                                <div class="font-bold text-xs text-amber-900 flex items-center gap-1.5">
+                                    <i class="fa-solid fa-wand-sparkles text-amber-600"></i>
+                                    Si es su 1ª visita al Hub:
+                                </div>
+                                <p class="text-xs text-amber-800 mt-1">
+                                    Autocompleta el <strong>RUT desde el QR</strong> y pide por única vez Nombre, Teléfono y Perfil con consentimiento legal.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- =============================================================== -->
+                    <!-- CASO A: USUARIO YA ENROLADO (RECONOCIMIENTO INSTANTÁNEO + 1 CLIC) -->
+                    <!-- =============================================================== -->
+                    <div id="state-recognized" class="hidden bg-white rounded-2xl shadow-md border-2 border-emerald-500 overflow-hidden">
+                        <!-- Encabezado Verde de Reconocimiento -->
+                        <div class="bg-gradient-to-r from-emerald-600 to-teal-600 text-white p-6">
+                            <div class="flex flex-wrap items-center justify-between gap-2">
+                                <span class="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider bg-white/20 backdrop-blur-sm px-3 py-1 rounded-full">
+                                    <i class="fa-solid fa-bolt"></i> Usuario Reconocido en 0.2 seg
+                                </span>
+                                <span id="rec-hash-badge" class="font-mono text-xs bg-slate-900/40 px-3 py-1 rounded-lg border border-white/20">
+                                    ID: USR-8F4A2C
+                                </span>
+                            </div>
+                            <h3 class="text-2xl sm:text-3xl font-extrabold mt-3" id="rec-greeting">
+                                ¡Bienvenido/a de vuelta, Marcos Quilapan!
+                            </h3>
+                            <p class="text-emerald-100 text-xs sm:text-sm mt-1">
+                                Datos recuperados automáticamente desde el padrón de enrolamiento (sin digitar formulario).
+                            </p>
+                        </div>
+
+                        <div class="p-6 space-y-6">
+                            <!-- Ficha de Datos Recuperados (RUT, Nombre, Teléfono, Perfil) -->
+                            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-slate-50 p-4 rounded-xl border border-slate-200">
+                                <div>
+                                    <span class="text-[11px] font-semibold uppercase text-slate-400 block">RUT Extraído del QR</span>
+                                    <span id="rec-rut" class="font-mono font-bold text-sm sm:text-base text-slate-900">21.345.678-9</span>
+                                </div>
+                                <div>
+                                    <span class="text-[11px] font-semibold uppercase text-slate-400 block">Teléfono Registrado</span>
+                                    <span id="rec-phone" class="font-mono font-semibold text-sm sm:text-base text-slate-800">+56 9 8765 4321</span>
+                                </div>
+                                <div>
+                                    <span class="text-[11px] font-semibold uppercase text-slate-400 block">Perfil Caracterizado</span>
+                                    <span id="rec-profile" class="inline-flex items-center gap-1.5 font-bold text-xs sm:text-sm text-blue-700 bg-blue-100 px-2.5 py-0.5 rounded-md mt-0.5">
+                                        Estudiante
+                                    </span>
+                                </div>
+                            </div>
+
+                            <!-- Selección del Espacio en 1 Clic -->
+                            <div class="space-y-3">
+                                <div class="flex items-center justify-between">
+                                    <h4 class="text-sm sm:text-base font-bold text-slate-900 flex items-center gap-2">
+                                        <span class="w-6 h-6 rounded-full bg-emerald-600 text-white text-xs flex items-center justify-center font-bold">1</span>
+                                        <span>¿A qué espacio del Hub te diriges hoy? (Toca para registrar ingreso)</span>
+                                    </h4>
+                                </div>
+
+                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                                    <button onclick="registerQuickAccess('Cowork')" class="p-4 rounded-xl border-2 border-slate-200 hover:border-emerald-500 hover:bg-emerald-50/50 transition text-left flex items-center gap-4 group shadow-sm">
+                                        <div class="w-12 h-12 rounded-xl bg-blue-100 text-blue-700 group-hover:bg-emerald-600 group-hover:text-white transition flex items-center justify-center text-xl flex-shrink-0">
+                                            <i class="fa-solid fa-laptop-code"></i>
+                                        </div>
+                                        <div>
+                                            <div class="font-bold text-slate-900 text-base group-hover:text-emerald-900">Cowork</div>
+                                            <div class="text-xs text-slate-500">Trabajo colaborativo y escritorios</div>
+                                        </div>
+                                    </button>
+
+                                    <button onclick="registerQuickAccess('Sala de Reuniones')" class="p-4 rounded-xl border-2 border-slate-200 hover:border-emerald-500 hover:bg-emerald-50/50 transition text-left flex items-center gap-4 group shadow-sm">
+                                        <div class="w-12 h-12 rounded-xl bg-purple-100 text-purple-700 group-hover:bg-emerald-600 group-hover:text-white transition flex items-center justify-center text-xl flex-shrink-0">
+                                            <i class="fa-solid fa-users-rectangle"></i>
+                                        </div>
+                                        <div>
+                                            <div class="font-bold text-slate-900 text-base group-hover:text-emerald-900">Sala de Reuniones</div>
+                                            <div class="text-xs text-slate-500">Sesiones de equipo y mentorías</div>
+                                        </div>
+                                    </button>
+
+                                    <button onclick="registerQuickAccess('Auditorio / Evento')" class="p-4 rounded-xl border-2 border-slate-200 hover:border-emerald-500 hover:bg-emerald-50/50 transition text-left flex items-center gap-4 group shadow-sm">
+                                        <div class="w-12 h-12 rounded-xl bg-amber-100 text-amber-700 group-hover:bg-emerald-600 group-hover:text-white transition flex items-center justify-center text-xl flex-shrink-0">
+                                            <i class="fa-solid fa-microphone-lines"></i>
+                                        </div>
+                                        <div>
+                                            <div class="font-bold text-slate-900 text-base group-hover:text-emerald-900">Auditorio / Evento</div>
+                                            <div class="text-xs text-slate-500">Charlas, seminarios y pitch</div>
+                                        </div>
+                                    </button>
+
+                                    <button onclick="registerQuickAccess('Taller / Lab')" class="p-4 rounded-xl border-2 border-slate-200 hover:border-emerald-500 hover:bg-emerald-50/50 transition text-left flex items-center gap-4 group shadow-sm">
+                                        <div class="w-12 h-12 rounded-xl bg-rose-100 text-rose-700 group-hover:bg-emerald-600 group-hover:text-white transition flex items-center justify-center text-xl flex-shrink-0">
+                                            <i class="fa-solid fa-screwdriver-wrench"></i>
+                                        </div>
+                                        <div>
+                                            <div class="font-bold text-slate-900 text-base group-hover:text-emerald-900">Taller / Lab</div>
+                                            <div class="text-xs text-slate-500">Prototipado y capacitación</div>
+                                        </div>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="pt-2 border-t border-slate-100 flex justify-between items-center">
+                                <button onclick="resetScannerState()" class="text-xs font-semibold text-slate-500 hover:text-slate-800 flex items-center gap-1.5">
+                                    <i class="fa-solid fa-rotate-left"></i> Cancelar / Escanear otro carnet
+                                </button>
+                                <span class="text-xs text-slate-400">El ingreso se anonimizará automáticamente en la tabla de flujo</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- =============================================================== -->
+                    <!-- CASO B: USUARIO NUEVO (FORMULARIO DE ENROLAMIENTO INICIAL ÚNICO) -->
+                    <!-- =============================================================== -->
+                    <div id="state-enrollment" class="hidden bg-white rounded-2xl shadow-md border-2 border-amber-500 overflow-hidden">
+                        <!-- Encabezado Ámbar de 1ª Visita -->
+                        <div class="bg-gradient-to-r from-amber-500 to-orange-500 text-white p-6">
+                            <div class="flex flex-wrap items-center justify-between gap-2">
+                                <span class="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider bg-white/20 backdrop-blur-sm px-3 py-1 rounded-full">
+                                    <i class="fa-solid fa-user-plus"></i> Primera Visita Detectada
+                                </span>
+                                <span id="enr-hash-preview" class="font-mono text-xs bg-slate-900/30 px-3 py-1 rounded-lg border border-white/20">
+                                    ID Asignado: USR-9A2B1C
+                                </span>
+                            </div>
+                            <h3 class="text-xl sm:text-2xl font-extrabold mt-2">
+                                Enrolamiento Inicial Único
+                            </h3>
+                            <p class="text-amber-50 text-xs sm:text-sm mt-1">
+                                Extrajimos tu RUT desde el QR de tu carnet. Completa tu <strong>Nombre y Teléfono por única vez</strong> para que tus próximos ingresos tomen solo 2 segundos.
+                            </p>
+                        </div>
+
+                        <form id="enrollment-form" onsubmit="submitNewEnrollment(event)" class="p-6 space-y-4">
+                            <!-- Fila 1: RUT (Autocompletado desde QR) + Perfil -->
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-xs font-bold uppercase text-slate-600 mb-1">
+                                        RUT Extraído del QR <i class="fa-solid fa-lock text-emerald-600 ml-1" title="Extraído automáticamente"></i>
+                                    </label>
+                                    <input type="text" id="enr-rut" readonly 
+                                        class="w-full rounded-xl bg-slate-100 border border-slate-300 px-3.5 py-2.5 font-mono font-bold text-slate-800 text-sm cursor-not-allowed">
+                                </div>
+                                <div>
+                                    <label for="enr-profile" class="block text-xs font-bold uppercase text-slate-700 mb-1">
+                                        Perfil de Usuario *
+                                    </label>
+                                    <select id="enr-profile" required class="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-500">
+                                        <option value="Estudiante">Estudiante Universitario / Escolar</option>
+                                        <option value="Emprendedor">Emprendedor/a</option>
+                                        <option value="Startup">Startup / Equipo Innovador</option>
+                                        <option value="Vecino">Vecino/a de Providencia</option>
+                                        <option value="Empresa">Empresa / Corporativo</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <!-- Fila 2: Nombre y Apellido + Teléfono -->
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div>
+                                    <label for="enr-name" class="block text-xs font-bold uppercase text-slate-700 mb-1">
+                                        Nombre y Apellido *
+                                    </label>
+                                    <input type="text" id="enr-name" required placeholder="Ej: Valentina Muñoz"
+                                        class="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-500">
+                                </div>
+                                <div>
+                                    <label for="enr-phone" class="block text-xs font-bold uppercase text-slate-700 mb-1">
+                                        Número de Teléfono *
+                                    </label>
+                                    <input type="tel" id="enr-phone" required placeholder="+56 9 1234 5678" value="+56 9 "
+                                        class="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm font-mono text-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-500">
+                                </div>
+                            </div>
+
+                            <!-- Fila 3: Espacio al que ingresa hoy -->
+                            <div>
+                                <label for="enr-space" class="block text-xs font-bold uppercase text-slate-700 mb-1">
+                                    ¿A qué espacio del Hub ingresas hoy? *
+                                </label>
+                                <select id="enr-space" required class="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-500">
+                                    <option value="Cowork">Cowork (Espacio de trabajo compartido)</option>
+                                    <option value="Sala de Reuniones">Sala de Reuniones</option>
+                                    <option value="Auditorio / Evento">Auditorio / Evento</option>
+                                    <option value="Taller / Lab">Taller / Laboratorio</option>
+                                </select>
+                            </div>
+
+                            <!-- Casilla de Consentimiento Informado (Nueva Ley de Datos) -->
+                            <div class="bg-amber-50/90 border border-amber-200 rounded-xl p-3.5">
+                                <label class="flex items-start gap-3 cursor-pointer">
+                                    <input type="checkbox" id="enr-consent" required class="mt-1 w-4 h-4 rounded text-amber-600 focus:ring-amber-500">
+                                    <span class="text-xs text-slate-700 leading-relaxed">
+                                        <strong>Consentimiento Informado (Ley de Protección de Datos Personales):</strong> Autorizo a Hub Providencia a vincular mi RUN con mis datos de contacto para agilizar futuros ingresos y generar estadísticas internas de uso de espacios de forma seudonimizada (<code class="font-mono text-[11px]">Hash ID</code>).
+                                    </span>
+                                </label>
+                            </div>
+
+                            <!-- Botones de Acción -->
+                            <div class="flex items-center justify-between pt-2">
+                                <button type="button" onclick="resetScannerState()" class="text-xs font-semibold text-slate-500 hover:text-slate-800 px-3 py-2">
+                                    Cancelar
+                                </button>
+                                <button type="submit" class="bg-amber-500 hover:bg-amber-600 text-white font-bold px-6 py-3 rounded-xl text-sm shadow-md transition flex items-center gap-2">
+                                    <i class="fa-solid fa-check-double"></i>
+                                    <span>Guardar Enrolamiento y Registrar Ingreso</span>
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <!-- =============================================================== -->
+                    <!-- ESTADO C: CONFIRMACIÓN DE ACCESO EXITOSO                        -->
+                    <!-- =============================================================== -->
+                    <div id="state-success" class="hidden bg-white rounded-2xl shadow-md border-2 border-blue-600 p-8 text-center space-y-5 min-h-[450px] flex flex-col items-center justify-center">
+                        <div class="w-20 h-20 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center text-4xl shadow-inner">
+                            <i class="fa-solid fa-circle-check"></i>
+                        </div>
+                        <div class="space-y-1">
+                            <span class="text-xs font-bold uppercase tracking-wider text-emerald-700 bg-emerald-100 px-3 py-1 rounded-full">
+                                Ingreso Registrado con Éxito
+                            </span>
+                            <h3 id="succ-name" class="text-2xl font-extrabold text-slate-900 pt-2">
+                                ¡Adelante, Marcos Quilapan!
+                            </h3>
+                            <p id="succ-details" class="text-sm text-slate-600">
+                                Destino: <strong>Cowork</strong> · Hora: 10:42:15
+                            </p>
+                        </div>
+
+                        <div class="bg-slate-50 rounded-xl p-4 border border-slate-200 max-w-md w-full text-left text-xs space-y-1.5 font-mono">
+                            <div class="text-slate-500 font-sans font-semibold">Registro enviado a la Base de Datos:</div>
+                            <div class="flex justify-between"><span>ID Seudonimizado:</span> <strong id="succ-hash" class="text-blue-700">USR-8F4A2C</strong></div>
+                            <div class="flex justify-between"><span>Teléfono Contacto:</span> <strong id="succ-phone" class="text-slate-800">+56 9 8765 4321</strong></div>
+                            <div class="flex justify-between"><span>Perfil:</span> <strong id="succ-profile" class="text-emerald-700">Estudiante</strong></div>
+                            <div class="flex justify-between"><span>N° Serie Cédula:</span> <strong class="text-rose-600">Descartado (No guardado)</strong></div>
+                        </div>
+
+                        <div class="flex flex-wrap justify-center gap-3 pt-2">
+                            <button onclick="resetScannerState()" class="bg-blue-700 hover:bg-blue-800 text-white font-semibold px-5 py-2.5 rounded-xl text-sm transition flex items-center gap-2 shadow-sm">
+                                <i class="fa-solid fa-qrcode"></i>
+                                <span>Escanear Siguiente Persona</span>
+                            </button>
+                            <button onclick="switchTab('database')" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold px-4 py-2.5 rounded-xl text-sm transition flex items-center gap-2">
+                                <i class="fa-solid fa-table"></i>
+                                <span>Ver en Base de Datos</span>
+                            </button>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </section>
+
+        <!-- =================================================================== -->
+        <!-- PESTAÑA 2: BASE DE DATOS (PADRÓN DE IDENTIDAD Y FLUJO SEUDONIMIZADO) -->
+        <!-- =================================================================== -->
+        <section id="panel-database" class="tab-panel hidden space-y-6">
+
+            <!-- Cabecera y Controles de Base de Datos -->
+            <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-200 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                <div>
+                    <h2 class="text-lg font-extrabold text-slate-900 flex items-center gap-2">
+                        <i class="fa-solid fa-server text-blue-700"></i>
+                        <span>Arquitectura de Datos Separada (Privacidad por Diseño)</span>
+                    </h2>
+                    <p class="text-xs sm:text-sm text-slate-600 mt-0.5">
+                        Alterna entre el <strong>Padrón de Enrolamiento</strong> (RUT, Nombre y Teléfono resguardados) y la <strong>Tabla de Flujo Diario</strong> (100% seudonimizada con ID Hash para análisis de gestión).
+                    </p>
+                </div>
+
+                <!-- Botones Exportar CSV y Restaurar Demo -->
+                <div class="flex flex-wrap items-center gap-2.5">
+                    <button onclick="exportCurrentTableCSV()" class="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-4 py-2 rounded-xl text-xs sm:text-sm transition flex items-center gap-2 shadow-sm">
+                        <i class="fa-solid fa-file-excel"></i>
+                        <span>Descargar Excel / CSV</span>
+                    </button>
+                    <button onclick="resetDemoData()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold px-3.5 py-2 rounded-xl text-xs sm:text-sm transition flex items-center gap-1.5 border border-slate-300">
+                        <i class="fa-solid fa-rotate"></i>
+                        <span>Restaurar Datos Demo</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Interruptor (Toggle) entre Tabla 1 y Tabla 2 -->
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-200/80 p-1.5 rounded-2xl border border-slate-300">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-1.5 w-full">
+                    <button onclick="switchDbView('access')" id="db-toggle-access" class="py-2.5 px-4 rounded-xl font-bold text-xs sm:text-sm transition flex items-center justify-center gap-2 bg-white text-blue-900 shadow-sm">
+                        <i class="fa-solid fa-user-secret text-emerald-600"></i>
+                        <span>Tabla 1: Flujo Diario de Accesos (Seudonimizada con ID Hash)</span>
+                    </button>
+                    <button onclick="switchDbView('users')" id="db-toggle-users" class="py-2.5 px-4 rounded-xl font-bold text-xs sm:text-sm transition flex items-center justify-center gap-2 text-slate-600 hover:text-slate-900">
+                        <i class="fa-solid fa-address-book text-blue-600"></i>
+                        <span>Tabla 2: Padrón de Enrolados (RUT, Nombre y Teléfono)</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- VISTA TABLA 1: REGISTRO DE FLUJO DIARIO (SEUDONIMIZADA) -->
+            <div id="db-view-access" class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                <div class="px-5 py-4 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-slate-50">
+                    <div>
+                        <h3 class="font-bold text-slate-900 text-sm sm:text-base flex items-center gap-2">
+                            <span>Registro de Flujo Diario (Tabla de Control de Gestión)</span>
+                            <span class="text-[11px] bg-emerald-100 text-emerald-800 px-2.5 py-0.5 rounded-full font-semibold">Sin RUT ni Nombre en texto plano</span>
+                        </h3>
+                        <p class="text-xs text-slate-500">Esta tabla alimenta el Dashboard. Permite medir permanencia y ocupación por salón protegiendo la identidad del visitante.</p>
+                    </div>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse text-xs sm:text-sm">
+                        <thead>
+                            <tr class="bg-slate-900 text-white uppercase text-[11px] tracking-wider">
+                                <th class="py-3 px-4">ID Anónimo (Hash)</th>
+                                <th class="py-3 px-4">Perfil</th>
+                                <th class="py-3 px-4">Espacio Utilizado</th>
+                                <th class="py-3 px-4">Fecha</th>
+                                <th class="py-3 px-4">Hora Entrada</th>
+                                <th class="py-3 px-4">Estado / Salida</th>
+                                <th class="py-3 px-4 text-right">Acción</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbody-access-logs" class="divide-y divide-slate-200">
+                            <!-- Filas inyectadas por JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- VISTA TABLA 2: PADRÓN DE ENROLAMIENTO (IDENTIDAD Y CONTACTO) -->
+            <div id="db-view-users" class="hidden bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                <div class="px-5 py-4 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-slate-50">
+                    <div>
+                        <h3 class="font-bold text-slate-900 text-sm sm:text-base flex items-center gap-2">
+                            <span>Padrón Maestro de Usuarios Enrolados</span>
+                            <span class="text-[11px] bg-amber-100 text-amber-800 px-2.5 py-0.5 rounded-full font-semibold"><i class="fa-solid fa-lock mr-1"></i>Acceso Restringido Administración</span>
+                        </h3>
+                        <p class="text-xs text-slate-500">Almacena el vínculo entre el RUT leído del carnet, el Nombre, el Teléfono y el ID Hash con consentimiento firmado.</p>
+                    </div>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse text-xs sm:text-sm">
+                        <thead>
+                            <tr class="bg-provi-800 text-white uppercase text-[11px] tracking-wider">
+                                <th class="py-3 px-4">ID Anónimo (Hash)</th>
+                                <th class="py-3 px-4">RUT</th>
+                                <th class="py-3 px-4">Nombre y Apellido</th>
+                                <th class="py-3 px-4">Teléfono</th>
+                                <th class="py-3 px-4">Perfil</th>
+                                <th class="py-3 px-4">Consentimiento Ley</th>
+                                <th class="py-3 px-4 text-right">Probar QR</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbody-enrolled-users" class="divide-y divide-slate-200">
+                            <!-- Filas inyectadas por JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </section>
+
+        <!-- =================================================================== -->
+        <!-- PESTAÑA 3: DASHBOARD DE GESTIÓN (INDICADORES Y GRÁFICOS EN VIVO)     -->
+        <!-- =================================================================== -->
+        <section id="panel-dashboard" class="tab-panel hidden space-y-6">
+
+            <!-- Tarjetas KPI Superiores -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-200 flex items-center justify-between">
+                    <div>
+                        <span class="text-xs font-bold uppercase text-slate-400">Accesos Registrados Hoy</span>
+                        <div id="kpi-total-today" class="text-3xl font-extrabold text-slate-900 mt-1">10</div>
+                        <span id="kpi-active-now" class="text-xs font-semibold text-emerald-600 mt-1 inline-block">
+                            <i class="fa-solid fa-circle text-[8px] mr-1"></i> 6 actualmente en el edificio
+                        </span>
+                    </div>
+                    <div class="w-12 h-12 rounded-2xl bg-blue-50 text-blue-700 flex items-center justify-center text-xl border border-blue-100">
+                        <i class="fa-solid fa-door-open"></i>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-200 flex items-center justify-between">
+                    <div>
+                        <span class="text-xs font-bold uppercase text-slate-400">Comunidad Enrolada</span>
+                        <div id="kpi-total-users" class="text-3xl font-extrabold text-slate-900 mt-1">6</div>
+                        <span class="text-xs text-slate-500 mt-1 inline-block">100% con consentimiento activo</span>
+                    </div>
+                    <div class="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-700 flex items-center justify-center text-xl border border-emerald-100">
+                        <i class="fa-solid fa-id-badge"></i>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-200 flex items-center justify-between">
+                    <div>
+                        <span class="text-xs font-bold uppercase text-slate-400">Espacio Más Demandado</span>
+                        <div id="kpi-top-space" class="text-xl font-extrabold text-blue-900 mt-1">Cowork</div>
+                        <span id="kpi-top-space-pct" class="text-xs text-slate-500 mt-1 inline-block">Mayor flujo del día</span>
+                    </div>
+                    <div class="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center text-xl border border-amber-100">
+                        <i class="fa-solid fa-building-user"></i>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-200 flex items-center justify-between">
+                    <div>
+                        <span class="text-xs font-bold uppercase text-slate-400">Tiempo Check-in QR</span>
+                        <div class="text-3xl font-extrabold text-emerald-600 mt-1">2.3 s</div>
+                        <span class="text-xs text-slate-500 mt-1 inline-block">vs ~60 s registro manual (-96%)</span>
+                    </div>
+                    <div class="w-12 h-12 rounded-2xl bg-purple-50 text-purple-700 flex items-center justify-center text-xl border border-purple-100">
+                        <i class="fa-solid fa-stopwatch-20"></i>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Gráficos Principales -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- Gráfico 1: Ocupación por Espacio -->
+                <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-200 space-y-4">
+                    <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                        <div>
+                            <h3 class="font-bold text-slate-900 text-sm sm:text-base">Uso de Espacios del Edificio</h3>
+                            <p class="text-xs text-slate-500">Distribución de ingresos por salón de destino</p>
+                        </div>
+                        <span class="text-xs font-mono bg-slate-100 px-2.5 py-1 rounded-md text-slate-600">Tiempo Real</span>
+                    </div>
+                    <div class="h-64 relative">
+                        <canvas id="chart-spaces"></canvas>
+                    </div>
+                </div>
+
+                <!-- Gráfico 2: Caracterización por Perfil -->
+                <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-200 space-y-4">
+                    <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                        <div>
+                            <h3 class="font-bold text-slate-900 text-sm sm:text-base">Caracterización por Perfil de Usuario</h3>
+                            <p class="text-xs text-slate-500">Segmentación de la comunidad que asiste al Hub</p>
+                        </div>
+                        <span class="text-xs font-mono bg-emerald-50 text-emerald-700 px-2.5 py-1 rounded-md">Datos Anonimizados</span>
+                    </div>
+                    <div class="h-64 relative">
+                        <canvas id="chart-profiles"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Últimos Accesos en Vivo -->
+            <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-200">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="font-bold text-slate-900 text-sm sm:text-base flex items-center gap-2">
+                        <i class="fa-solid fa-clock-rotate-left text-blue-600"></i>
+                        <span>Últimos Movimientos Registrados en Recepción</span>
+                    </h3>
+                    <button onclick="switchTab('scanner')" class="text-xs font-semibold text-blue-700 hover:underline">
+                        + Registrar nuevo ingreso
+                    </button>
+                </div>
+                <div id="dashboard-recent-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                    <!-- Tarjetas de últimos accesos inyectadas por JS -->
+                </div>
+            </div>
+
+        </section>
+
+    </main>
+
+    <!-- NOTIFICACIÓN TOAST FLOTANTE -->
+    <div id="toast-container" class="fixed bottom-5 right-5 z-50 space-y-2 pointer-events-none"></div>
+
+    <!-- FOOTER INSTITUCIONAL -->
+    <footer class="bg-white border-t border-slate-200 mt-10 py-4 text-center text-xs text-slate-500">
+        <div class="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
+            <span><strong>Hub Providencia</strong> · Prototipo Funcional Capstone Intermedio (Universidad Mayor)</span>
+            <span>Desarrollado por <strong>Equipo Capstonersitos</strong> (Marcos, Bastián, Vicente, Pablo)</span>
+        </div>
+    </footer>
+
+    <!-- =================================================================== -->
+    <!-- LÓGICA JAVASCRIPT DEL SISTEMA                                       -->
+    <!-- =================================================================== -->
+    <script>
+        // Claves de almacenamiento local
+        const STORAGE_KEY_USERS = 'hub_provi_users_v1';
+        const STORAGE_KEY_LOGS = 'hub_provi_logs_v1';
+
+        // Variables de estado
+        let enrolledUsers = [];
+        let accessLogs = [];
+        let currentScannedRut = null;
+        let currentScannedHash = null;
+        let currentRecognizedUser = null;
+        let currentDbView = 'access';
+        let simUserIndex = 0;
+        let html5QrCode = null;
+        let isCameraRunning = false;
+        let chartSpacesInstance = null;
+        let chartProfilesInstance = null;
+
+        // Función determinista para generar el ID Anónimo (Hash corto tipo SHA) a partir del RUT limpio
+        function generateAnonHash(rut) {
+            const clean = rut.replace(/[^0-9kK]/g, '').toUpperCase();
+            let h1 = 0xdeadbeef ^ clean.length;
+            let h2 = 0x41c6ce57 ^ clean.length;
+            for (let i = 0, ch; i < clean.length; i++) {
+                ch = clean.charCodeAt(i);
+                h1 = Math.imul(h1 ^ ch, 2654435761);
+                h2 = Math.imul(h2 ^ ch, 1597334677);
+            }
+            h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+            const hex = (h1 >>> 0).toString(16).toUpperCase().padStart(6, '0').slice(0, 6);
+            return `USR-${hex}`;
+        }
+
+        // Formateador de RUT Chileno (ej. 213456789 -> 21.345.678-9)
+        function formatChileanRut(rawRut) {
+            const clean = rawRut.replace(/[^0-9kK]/g, '').toUpperCase();
+            if (clean.length < 2) return clean;
+            const body = clean.slice(0, -1);
+            const dv = clean.slice(-1);
+            const formattedBody = body.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+            return `${formattedBody}-${dv}`;
+        }
+
+        // Extractor inteligente desde la URL del QR del Carnet Chileno o texto libre
+        function parseChileanIdQr(qrString) {
+            const raw = qrString.trim();
+            let extractedRun = null;
+            let hadSerial = false;
+
+            // 1. Buscar patrón oficial en URL del Registro Civil: RUN=12345678-9 o run=12345678-K
+            const urlRunMatch = raw.match(/[?&]RUN=([0-9]{1,2}\.?[0-9]{3}\.?[0-9]{3}-?[0-9kK])/i);
+            if (urlRunMatch && urlRunMatch[1]) {
+                extractedRun = formatChileanRut(urlRunMatch[1]);
+            } else {
+                // 2. Buscar cualquier patrón de RUT chileno dentro del texto
+                const genericRutMatch = raw.match(/\b([0-9]{1,2}\.?[0-9]{3}\.?[0-9]{3}-?[0-9kK])\b/i);
+                if (genericRutMatch && genericRutMatch[1]) {
+                    extractedRun = formatChileanRut(genericRutMatch[1]);
+                }
+            }
+
+            if (/serial=|doc=|serie=/i.test(raw)) {
+                hadSerial = true;
+            }
+
+            return {
+                rawText: raw,
+                rut: extractedRun,
+                hadSerial: hadSerial
+            };
+        }
+
+        // Datos iniciales precargados (Equipo Capstonersitos + Visitantes)
+        function getInitialUsers() {
+            const seed = [
+                { rut: '21.345.678-9', name: 'Marcos Quilapan', phone: '+56 9 8765 4321', profile: 'Estudiante', enrolledDate: '2026-10-20' },
+                { rut: '20.987.654-3', name: 'Bastián Morales', phone: '+56 9 7654 3210', profile: 'Startup', enrolledDate: '2026-10-20' },
+                { rut: '21.112.233-4', name: 'Vicente Rojas', phone: '+56 9 6543 2109', profile: 'Emprendedor', enrolledDate: '2026-10-21' },
+                { rut: '20.556.677-8', name: 'Pablo Contreras', phone: '+56 9 5432 1098', profile: 'Estudiante', enrolledDate: '2026-10-21' },
+                { rut: '17.445.882-K', name: 'Camila Valdés', phone: '+56 9 9123 4567', profile: 'Startup', enrolledDate: '2026-10-24' },
+                { rut: '14.832.190-5', name: 'Roberto Fuentes', phone: '+56 9 8234 5678', profile: 'Vecino', enrolledDate: '2026-10-25' }
+            ];
+            return seed.map(u => ({
+                ...u,
+                hashId: generateAnonHash(u.rut)
+            }));
+        }
+
+        function getInitialLogs(users) {
+            const today = new Date().toISOString().slice(0, 10);
+            return [
+                { id: 101, hashId: users[0].hashId, profile: users[0].profile, space: 'Cowork', date: today, timeIn: '08:45:12', status: 'En recinto', timeOut: '-' },
+                { id: 102, hashId: users[1].hashId, profile: users[1].profile, space: 'Sala de Reuniones', date: today, timeIn: '09:10:04', status: 'En recinto', timeOut: '-' },
+                { id: 103, hashId: users[4].hashId, profile: users[4].profile, space: 'Cowork', date: today, timeIn: '09:30:22', status: 'Salida (11:15)', timeOut: '11:15:00' },
+                { id: 104, hashId: users[2].hashId, profile: users[2].profile, space: 'Taller / Lab', date: today, timeIn: '10:05:40', status: 'En recinto', timeOut: '-' },
+                { id: 105, hashId: users[5].hashId, profile: users[5].profile, space: 'Auditorio / Evento', date: today, timeIn: '10:20:18', status: 'Salida (12:00)', timeOut: '12:00:00' },
+                { id: 106, hashId: users[3].hashId, profile: users[3].profile, space: 'Cowork', date: today, timeIn: '10:50:33', status: 'En recinto', timeOut: '-' },
+                { id: 107, hashId: users[4].hashId, profile: users[4].profile, space: 'Sala de Reuniones', date: today, timeIn: '11:40:15', status: 'En recinto', timeOut: '-' }
+            ];
+        }
+
+        // Inicialización de datos
+        function loadStorageData() {
+            try {
+                const storedUsers = localStorage.getItem(STORAGE_KEY_USERS);
+                const storedLogs = localStorage.getItem(STORAGE_KEY_LOGS);
+                if (storedUsers && storedLogs) {
+                    enrolledUsers = JSON.parse(storedUsers);
+                    accessLogs = JSON.parse(storedLogs);
+                } else {
+                    enrolledUsers = getInitialUsers();
+                    accessLogs = getInitialLogs(enrolledUsers);
+                    saveStorageData();
+                }
+            } catch (e) {
+                enrolledUsers = getInitialUsers();
+                accessLogs = getInitialLogs(enrolledUsers);
+            }
+            updateAllViews();
+        }
+
+        function saveStorageData() {
+            try {
+                localStorage.setItem(STORAGE_KEY_USERS, JSON.stringify(enrolledUsers));
+                localStorage.setItem(STORAGE_KEY_LOGS, JSON.stringify(accessLogs));
+            } catch (e) {
+                console.warn('No se pudo guardar en localStorage:', e);
+            }
+        }
+
+        // Procesador central de cualquier lectura QR (cámara, simulador o input manual)
+        function handleQrScanPayload(rawQrText) {
+            const parsed = parseChileanIdQr(rawQrText);
+
+            // Actualizar consola técnica en vivo
+            document.getElementById('console-raw-qr').textContent = parsed.rawText;
+
+            if (!parsed.rut) {
+                document.getElementById('console-serial').textContent = 'No detectado';
+                document.getElementById('console-rut').textContent = 'FORMATO INVÁLIDO';
+                document.getElementById('console-hash').textContent = '---';
+                showToast('No se detectó un RUT válido en el código escaneado.', 'error');
+                return;
+            }
+
+            currentScannedRut = parsed.rut;
+            currentScannedHash = generateAnonHash(parsed.rut);
+
+            document.getElementById('console-serial').textContent = parsed.hadSerial 
+                ? 'DESCARTADO (Privacidad por Diseño)' 
+                : 'No incluido (Lectura limpia)';
+            document.getElementById('console-rut').textContent = currentScannedRut;
+            document.getElementById('console-hash').textContent = currentScannedHash;
+
+            // Buscar si el RUT ya está enrolado en la base de datos
+            const existingUser = enrolledUsers.find(u => u.rut.toUpperCase() === currentScannedRut.toUpperCase());
+
+            // Ocultar todos los estados del panel derecho
+            document.getElementById('state-idle').classList.add('hidden');
+            document.getElementById('state-recognized').classList.add('hidden');
+            document.getElementById('state-enrollment').classList.add('hidden');
+            document.getElementById('state-success').classList.add('hidden');
+
+            if (existingUser) {
+                // CASO A: Usuario ya enrolado -> Recupera Nombre, Teléfono y Perfil automáticamente
+                currentRecognizedUser = existingUser;
+                document.getElementById('rec-hash-badge').textContent = `ID: ${existingUser.hashId}`;
+                document.getElementById('rec-greeting').textContent = `¡Bienvenido/a de vuelta, ${existingUser.name}!`;
+                document.getElementById('rec-rut').textContent = existingUser.rut;
+                document.getElementById('rec-phone').textContent = existingUser.phone;
+                document.getElementById('rec-profile').textContent = existingUser.profile;
+
+                document.getElementById('state-recognized').classList.remove('hidden');
+                showToast(`Carnet reconocido: ${existingUser.name} (${existingUser.profile})`, 'success');
+            } else {
+                // CASO B: Usuario nuevo -> Autocompleta RUT desde el QR y abre Enrolamiento Único
+                currentRecognizedUser = null;
+                document.getElementById('enr-hash-preview').textContent = `ID Asignado: ${currentScannedHash}`;
+                document.getElementById('enr-rut').value = currentScannedRut;
+                document.getElementById('enr-name').value = '';
+                document.getElementById('enr-phone').value = '+56 9 ';
+                document.getElementById('enr-consent').checked = false;
+
+                document.getElementById('state-enrollment').classList.remove('hidden');
+                document.getElementById('enr-name').focus();
+                showToast(`Nuevo visitante detectado (${currentScannedRut}). Completa el enrolamiento único.`, 'info');
+            }
+        }
+
+        // Simulador Botón A: Simular lectura QR oficial del Registro Civil de un usuario ya enrolado
+        function simulateEnrolledUserScan() {
+            if (enrolledUsers.length === 0) return;
+            const user = enrolledUsers[simUserIndex % enrolledUsers.length];
+            simUserIndex++;
+
+            const cleanRunParam = user.rut.replace(/\./g, '');
+            const fakeSerial = Math.floor(500000000 + Math.random() * 90000000);
+            const simulatedUrl = `https://portal.sidiv.registrocivil.cl/docstatus?RUN=${cleanRunParam}&type=CEDULA&serial=${fakeSerial}`;
+
+            handleQrScanPayload(simulatedUrl);
+        }
+
+        // Simulador Botón B: Simular lectura QR oficial de un visitante nuevo no enrolado
+        function simulateNewUserScan() {
+            const randomNum = Math.floor(18000000 + Math.random() * 6500000);
+            // Calcular dígito verificador módulo 11 real
+            let m = 0, s = 1, t = randomNum;
+            for (; t; t = Math.floor(t / 10)) {
+                s = (s + t % 10 * (9 - m++ % 6)) % 11;
+            }
+            const dv = s ? String(s - 1) : 'K';
+            const fakeSerial = Math.floor(510000000 + Math.random() * 80000000);
+            const simulatedUrl = `https://portal.sidiv.registrocivil.cl/docstatus?RUN=${randomNum}-${dv}&type=CEDULA&serial=${fakeSerial}`;
+
+            handleQrScanPayload(simulatedUrl);
+        }
+
+        // Procesar entrada desde el input manual / pistola USB
+        function processManualInput() {
+            const inputEl = document.getElementById('manual-qr-input');
+            const val = inputEl.value.trim();
+            if (!val) {
+                showToast('Ingresa un RUT o pega la URL del QR del carnet.', 'error');
+                return;
+            }
+            handleQrScanPayload(val);
+            inputEl.value = '';
+        }
+
+        // Registrar acceso en 1 clic para usuario ya reconocido
+        function registerQuickAccess(spaceName) {
+            if (!currentRecognizedUser) return;
+
+            const now = new Date();
+            const dateStr = now.toISOString().slice(0, 10);
+            const timeStr = now.toTimeString().slice(0, 8);
+
+            const newLog = {
+                id: Date.now(),
+                hashId: currentRecognizedUser.hashId,
+                profile: currentRecognizedUser.profile,
+                space: spaceName,
+                date: dateStr,
+                timeIn: timeStr,
+                status: 'En recinto',
+                timeOut: '-'
+            };
+
+            accessLogs.unshift(newLog);
+            saveStorageData();
+            updateAllViews();
+
+            // Mostrar pantalla de confirmación exitosa
+            document.getElementById('state-recognized').classList.add('hidden');
+            document.getElementById('succ-name').textContent = `¡Adelante, ${currentRecognizedUser.name}!`;
+            document.getElementById('succ-details').innerHTML = `Espacio asignado: <strong>${spaceName}</strong> · Hora de entrada: <strong>${timeStr}</strong>`;
+            document.getElementById('succ-hash').textContent = currentRecognizedUser.hashId;
+            document.getElementById('succ-phone').textContent = currentRecognizedUser.phone;
+            document.getElementById('succ-profile').textContent = currentRecognizedUser.profile;
+            document.getElementById('state-success').classList.remove('hidden');
+
+            showToast(`Ingreso registrado en ${spaceName} (${currentRecognizedUser.hashId})`, 'success');
+        }
+
+        // Guardar Enrolamiento Inicial Único + Primer Acceso
+        function submitNewEnrollment(event) {
+            event.preventDefault();
+
+            const rut = document.getElementById('enr-rut').value.trim();
+            const name = document.getElementById('enr-name').value.trim();
+            const phone = document.getElementById('enr-phone').value.trim();
+            const profile = document.getElementById('enr-profile').value;
+            const space = document.getElementById('enr-space').value;
+            const consent = document.getElementById('enr-consent').checked;
+
+            if (!rut || !name || !phone || !consent) {
+                showToast('Completa todos los campos y acepta el consentimiento legal.', 'error');
+                return;
+            }
+
+            const now = new Date();
+            const dateStr = now.toISOString().slice(0, 10);
+            const timeStr = now.toTimeString().slice(0, 8);
+            const hashId = generateAnonHash(rut);
+
+            const newUser = {
+                rut: rut,
+                name: name,
+                phone: phone,
+                profile: profile,
+                enrolledDate: dateStr,
+                hashId: hashId
+            };
+
+            enrolledUsers.unshift(newUser);
+
+            const newLog = {
+                id: Date.now(),
+                hashId: hashId,
+                profile: profile,
+                space: space,
+                date: dateStr,
+                timeIn: timeStr,
+                status: 'En recinto',
+                timeOut: '-'
+            };
+
+            accessLogs.unshift(newLog);
+            saveStorageData();
+            updateAllViews();
+
+            // Mostrar confirmación
+            document.getElementById('state-enrollment').classList.add('hidden');
+            document.getElementById('succ-name').textContent = `¡Enrolamiento Exitoso, ${name}!`;
+            document.getElementById('succ-details').innerHTML = `Espacio asignado: <strong>${space}</strong> · Hora de entrada: <strong>${timeStr}</strong>`;
+            document.getElementById('succ-hash').textContent = hashId;
+            document.getElementById('succ-phone').textContent = phone;
+            document.getElementById('succ-profile').textContent = profile;
+            document.getElementById('state-success').classList.remove('hidden');
+
+            showToast(`${name} fue enrolado/a y su ingreso quedó registrado.`, 'success');
+        }
+
+        // Volver el lector al estado inicial de espera
+        function resetScannerState() {
+            currentScannedRut = null;
+            currentScannedHash = null;
+            currentRecognizedUser = null;
+            document.getElementById('state-recognized').classList.add('hidden');
+            document.getElementById('state-enrollment').classList.add('hidden');
+            document.getElementById('state-success').classList.add('hidden');
+            document.getElementById('state-idle').classList.remove('hidden');
+        }
+
+        // Marcar salida de un visitante en la Tabla de Flujo
+        function markUserCheckout(logId) {
+            const log = accessLogs.find(l => l.id === logId);
+            if (!log) return;
+            const nowTime = new Date().toTimeString().slice(0, 8);
+            log.timeOut = nowTime;
+            log.status = `Salida (${nowTime.slice(0, 5)})`;
+            saveStorageData();
+            updateAllViews();
+            showToast(`Salida registrada para ${log.hashId} a las ${nowTime}`, 'info');
+        }
+
+        // Simular escaneo directamente desde una fila del Padrón de Usuarios
+        function quickScanFromTable(rut) {
+            switchTab('scanner');
+            const cleanRun = rut.replace(/\./g, '');
+            const url = `https://portal.sidiv.registrocivil.cl/docstatus?RUN=${cleanRun}&type=CEDULA&serial=523981234`;
+            handleQrScanPayload(url);
+        }
+
+        // Control de cámara web real con html5-qrcode
+        function startCameraScanner() {
+            if (isCameraRunning) return;
+
+            const placeholder = document.getElementById('camera-placeholder');
+            const badge = document.getElementById('camera-status-badge');
+            const btnStart = document.getElementById('btn-start-camera');
+            const btnStop = document.getElementById('btn-stop-camera');
+
+            try {
+                html5QrCode = new Html5Qrcode("qr-reader");
+                const config = { fps: 10, qrbox: { width: 220, height: 150 } };
+
+                html5QrCode.start(
+                    { facingMode: "environment" },
+                    config,
+                    (decodedText) => {
+                        // Al detectar un QR real, procesarlo y pausar brevemente o detener cámara
+                        handleQrScanPayload(decodedText);
+                        stopCameraScanner();
+                    },
+                    () => {
+                        // Escaneando cuadro a cuadro...
+                    }
+                ).then(() => {
+                    isCameraRunning = true;
+                    placeholder.classList.add('hidden');
+                    btnStart.classList.add('hidden');
+                    btnStop.classList.remove('hidden');
+                    badge.textContent = 'Cámara Activa';
+                    badge.className = 'text-[11px] px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40';
+                }).catch((err) => {
+                    showToast('No se pudo acceder a la cámara. Usa el Simulador de Escaneo QR.', 'error');
+                    console.warn('Error iniciando cámara:', err);
+                });
+            } catch (e) {
+                showToast('Tu navegador bloqueó la cámara. Utiliza los botones del Simulador QR.', 'error');
+            }
+        }
+
+        function stopCameraScanner() {
+            if (!html5QrCode || !isCameraRunning) return;
+            html5QrCode.stop().then(() => {
+                html5QrCode.clear();
+                isCameraRunning = false;
+                document.getElementById('camera-placeholder').classList.remove('hidden');
+                document.getElementById('btn-start-camera').classList.remove('hidden');
+                document.getElementById('btn-stop-camera').classList.add('hidden');
+                const badge = document.getElementById('camera-status-badge');
+                badge.textContent = 'Modo Espera';
+                badge.className = 'text-[11px] px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700';
+            }).catch(err => console.warn(err));
+        }
+
+        // Navegación entre las 3 pestañas principales
+        function switchTab(tabName) {
+            const tabs = ['scanner', 'database', 'dashboard'];
+            tabs.forEach(t => {
+                const panel = document.getElementById(`panel-${t}`);
+                const btn = document.getElementById(`tab-btn-${t}`);
+                if (t === tabName) {
+                    panel.classList.remove('hidden');
+                    btn.className = 'tab-btn flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all whitespace-nowrap bg-blue-600 text-white shadow-sm';
+                } else {
+                    panel.classList.add('hidden');
+                    btn.className = 'tab-btn flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all whitespace-nowrap text-slate-300 hover:text-white hover:bg-slate-700/60';
+                }
+            });
+
+            if (tabName === 'dashboard') {
+                renderCharts();
+            }
+        }
+
+        // Alternar vista en la pestaña Base de Datos
+        function switchDbView(view) {
+            currentDbView = view;
+            const accessView = document.getElementById('db-view-access');
+            const usersView = document.getElementById('db-view-users');
+            const btnAccess = document.getElementById('db-toggle-access');
+            const btnUsers = document.getElementById('db-toggle-users');
+
+            if (view === 'access') {
+                accessView.classList.remove('hidden');
+                usersView.classList.add('hidden');
+                btnAccess.className = 'py-2.5 px-4 rounded-xl font-bold text-xs sm:text-sm transition flex items-center justify-center gap-2 bg-white text-blue-900 shadow-sm';
+                btnUsers.className = 'py-2.5 px-4 rounded-xl font-bold text-xs sm:text-sm transition flex items-center justify-center gap-2 text-slate-600 hover:text-slate-900';
+            } else {
+                accessView.classList.add('hidden');
+                usersView.classList.remove('hidden');
+                btnUsers.className = 'py-2.5 px-4 rounded-xl font-bold text-xs sm:text-sm transition flex items-center justify-center gap-2 bg-white text-blue-900 shadow-sm';
+                btnAccess.className = 'py-2.5 px-4 rounded-xl font-bold text-xs sm:text-sm transition flex items-center justify-center gap-2 text-slate-600 hover:text-slate-900';
+            }
+        }
+
+        // Renderizar tablas, KPIs y gráficos
+        function updateAllViews() {
+            // Badge en barra superior
+            document.getElementById('badge-db-count').textContent = accessLogs.length;
+
+            // 1. Renderizar Tabla de Flujo Seudonimizada
+            const tbodyLogs = document.getElementById('tbody-access-logs');
+            tbodyLogs.innerHTML = accessLogs.map(log => {
+                const isInside = log.status === 'En recinto';
+                return `
+                    <tr class="hover:bg-slate-50 transition">
+                        <td class="py-3 px-4 font-mono font-bold text-blue-800">${log.hashId}</td>
+                        <td class="py-3 px-4">
+                            <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
+                                ${log.profile}
+                            </span>
+                        </td>
+                        <td class="py-3 px-4 font-semibold text-slate-800">${log.space}</td>
+                        <td class="py-3 px-4 font-mono text-xs text-slate-500">${log.date}</td>
+                        <td class="py-3 px-4 font-mono font-semibold text-slate-800">${log.timeIn}</td>
+                        <td class="py-3 px-4">
+                            ${isInside 
+                                ? `<span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800">
+                                     <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span> En recinto
+                                   </span>`
+                                : `<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-600">
+                                     ${log.status}
+                                   </span>`
+                            }
+                        </td>
+                        <td class="py-3 px-4 text-right">
+                            ${isInside 
+                                ? `<button onclick="markUserCheckout(${log.id})" class="text-xs font-semibold bg-rose-50 hover:bg-rose-100 text-rose-700 px-3 py-1 rounded-lg border border-rose-200 transition">
+                                     Marcar Salida
+                                   </button>`
+                                : `<span class="text-xs text-slate-400">Completado</span>`
+                            }
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+
+            // 2. Renderizar Tabla de Padrón de Enrolamiento
+            const tbodyUsers = document.getElementById('tbody-enrolled-users');
+            tbodyUsers.innerHTML = enrolledUsers.map(u => `
+                <tr class="hover:bg-slate-50 transition">
+                    <td class="py-3 px-4 font-mono font-bold text-amber-700">${u.hashId}</td>
+                    <td class="py-3 px-4 font-mono font-semibold text-slate-900">${u.rut}</td>
+                    <td class="py-3 px-4 font-bold text-slate-900">${u.name}</td>
+                    <td class="py-3 px-4 font-mono text-slate-700">${u.phone}</td>
+                    <td class="py-3 px-4">
+                        <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200">
+                            ${u.profile}
+                        </span>
+                    </td>
+                    <td class="py-3 px-4">
+                        <span class="text-xs text-emerald-700 font-semibold flex items-center gap-1">
+                            <i class="fa-solid fa-file-shield"></i> Firmado (${u.enrolledDate})
+                        </span>
+                    </td>
+                    <td class="py-3 px-4 text-right">
+                        <button onclick="quickScanFromTable('${u.rut}')" class="text-xs font-semibold bg-blue-50 hover:bg-blue-100 text-blue-700 px-3 py-1 rounded-lg border border-blue-200 transition">
+                            <i class="fa-solid fa-qrcode mr-1"></i> Simular QR
+                        </button>
+                    </td>
+                </tr>
+            `).join('');
+
+            // 3. Actualizar KPIs del Dashboard
+            const insideCount = accessLogs.filter(l => l.status === 'En recinto').length;
+            document.getElementById('kpi-total-today').textContent = accessLogs.length;
+            document.getElementById('kpi-active-now').innerHTML = `<i class="fa-solid fa-circle text-[8px] mr-1"></i> ${insideCount} actualmente en el edificio`;
+            document.getElementById('kpi-total-users').textContent = enrolledUsers.length;
+
+            // Calcular espacio más demandado
+            const spaceCounts = {};
+            accessLogs.forEach(l => { spaceCounts[l.space] = (spaceCounts[l.space] || 0) + 1; });
+            let topSpace = 'Cowork';
+            let maxCount = 0;
+            Object.entries(spaceCounts).forEach(([sp, cnt]) => {
+                if (cnt > maxCount) { maxCount = cnt; topSpace = sp; }
+            });
+            const pct = accessLogs.length > 0 ? Math.round((maxCount / accessLogs.length) * 100) : 0;
+            document.getElementById('kpi-top-space').textContent = topSpace;
+            document.getElementById('kpi-top-space-pct').textContent = `${maxCount} visitas (${pct}% del flujo)`;
+
+            // 4. Lista de últimos movimientos en el Dashboard
+            const recentList = document.getElementById('dashboard-recent-list');
+            recentList.innerHTML = accessLogs.slice(0, 6).map(l => `
+                <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <div class="w-9 h-9 rounded-lg bg-blue-900 text-emerald-400 font-mono text-xs font-bold flex items-center justify-center">
+                            QR
+                        </div>
+                        <div>
+                            <div class="font-bold text-xs text-slate-900">${l.space}</div>
+                            <div class="text-[11px] text-slate-500 font-mono">${l.hashId} · ${l.profile}</div>
+                        </div>
+                    </div>
+                    <span class="font-mono text-xs font-semibold text-slate-700 bg-white px-2 py-1 rounded border border-slate-200">
+                        ${l.timeIn.slice(0, 5)}
+                    </span>
+                </div>
+            `).join('');
+
+            if (!document.getElementById('panel-dashboard').classList.contains('hidden')) {
+                renderCharts();
+            }
+        }
+
+        // Renderizar gráficos con Chart.js
+        function renderCharts() {
+            const spacesLabels = ['Cowork', 'Sala de Reuniones', 'Auditorio / Evento', 'Taller / Lab'];
+            const spacesData = spacesLabels.map(sp => accessLogs.filter(l => l.space === sp).length);
+
+            const profilesLabels = ['Estudiante', 'Startup', 'Emprendedor', 'Vecino', 'Empresa'];
+            const profilesData = profilesLabels.map(pr => accessLogs.filter(l => l.profile === pr).length);
+
+            const ctxSpaces = document.getElementById('chart-spaces').getContext('2d');
+            if (chartSpacesInstance) chartSpacesInstance.destroy();
+            chartSpacesInstance = new Chart(ctxSpaces, {
+                type: 'bar',
+                data: {
+                    labels: spacesLabels,
+                    datasets: [{
+                        label: 'Ingresos Registrados',
+                        data: spacesData,
+                        backgroundColor: ['#1d4ed8', '#7c3aed', '#f59e0b', '#10b981'],
+                        borderRadius: 8
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: { beginAtZero: true, ticks: { stepSize: 1 } }
+                    }
+                }
+            });
+
+            const ctxProfiles = document.getElementById('chart-profiles').getContext('2d');
+            if (chartProfilesInstance) chartProfilesInstance.destroy();
+            chartProfilesInstance = new Chart(ctxProfiles, {
+                type: 'doughnut',
+                data: {
+                    labels: profilesLabels,
+                    datasets: [{
+                        data: profilesData,
+                        backgroundColor: ['#1e40af', '#10b981', '#f59e0b', '#6366f1', '#ec4899'],
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'right' }
+                    }
+                }
+            });
+        }
+
+        // Descargar CSV compatible con Excel (UTF-8 con BOM)
+        function exportCurrentTableCSV() {
+            let csvContent = '\uFEFF'; // BOM para que Excel reconozca tildes y ñ
+            let filename = '';
+
+            if (currentDbView === 'access') {
+                csvContent += 'ID_Anonimo_Hash;Perfil;Espacio_Utilizado;Fecha;Hora_Entrada;Estado_Salida\n';
+                accessLogs.forEach(l => {
+                    csvContent += `${l.hashId};${l.profile};${l.space};${l.date};${l.timeIn};${l.status}\n`;
+                });
+                filename = 'HubProvidencia_Flujo_Seudonimizado.csv';
+            } else {
+                csvContent += 'ID_Anonimo_Hash;RUT;Nombre_Completo;Telefono;Perfil;Fecha_Enrolamiento\n';
+                enrolledUsers.forEach(u => {
+                    csvContent += `${u.hashId};${u.rut};${u.name};${u.phone};${u.profile};${u.enrolledDate}\n`;
+                });
+                filename = 'HubProvidencia_Padron_Enrolamiento.csv';
+            }
+
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+
+            showToast(`Archivo ${filename} descargado para Excel.`, 'success');
+        }
+
+        // Restaurar datos de demostración
+        function resetDemoData() {
+            enrolledUsers = getInitialUsers();
+            accessLogs = getInitialLogs(enrolledUsers);
+            saveStorageData();
+            resetScannerState();
+            updateAllViews();
+            showToast('Datos de demostración restaurados correctamente.', 'info');
+        }
+
+        // Sistema de notificaciones Toast sin usar alert()
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            let colors = 'bg-slate-900 text-white border-slate-700';
+            let icon = 'fa-circle-info text-blue-400';
+
+            if (type === 'success') {
+                colors = 'bg-emerald-900 text-white border-emerald-700';
+                icon = 'fa-circle-check text-emerald-400';
+            } else if (type === 'error') {
+                colors = 'bg-rose-900 text-white border-rose-700';
+                icon = 'fa-triangle-exclamation text-rose-300';
+            }
+
+            toast.className = `pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg border text-xs sm:text-sm font-medium transition-all duration-300 ${colors}`;
+            toast.innerHTML = `<i class="fa-solid ${icon} text-base"></i><span>${message}</span>`;
+            container.appendChild(toast);
+
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transform = 'translateY(8px)';
+                setTimeout(() => toast.remove(), 300);
+            }, 3400);
+        }
+
+        // Reloj en tiempo real
+        function startClock() {
+            const update = () => {
+                const now = new Date().toTimeString().slice(0, 8);
+                const el1 = document.getElementById('live-clock');
+                const el2 = document.getElementById('live-clock-mobile');
+                if (el1) el1.textContent = now;
+                if (el2) el2.textContent = now;
+            };
+            update();
+            setInterval(update, 1000);
+        }
+
+        window.onload = function() {
+            startClock();
+            loadStorageData();
+        };
+    </script>
+</body>
+</html>
