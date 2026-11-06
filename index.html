@@ -368,6 +368,7 @@
     // URL OFICIAL DE TU GOOGLE APPS SCRIPT (/exec)
     const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycby9it1egYMQ98BAMxDQIkmtXL8m_kmd7lt2m9FT42K63ZuwbcPjmIl_osOxenT3FkmKMQ/exec";
 
+    // Base local inicial con Marcos, Thiare, Catalina y Byron
     let padronUsuarios = JSON.parse(localStorage.getItem("hub_padron_v3")) || {
       "21132923-8": { idAnonimo: "USR-7A21M9", nombre: "Marcos", telefono: "+56 9 9123 4567", perfil: "Estudiante" },
       "20456789-1": { idAnonimo: "USR-8F92A1", nombre: "Thiare", telefono: "+56 9 8765 4321", perfil: "Emprendedor" },
@@ -419,6 +420,7 @@
       return limpio.slice(0, -1) + "-" + limpio.slice(-1);
     }
 
+    // MOTOR DE CÁMARA DIRECTO CON RECORTE REAL EN EL ZOOM
     async function iniciarCamara() {
       detenerCamara();
       const video = document.getElementById("videoPreview");
@@ -566,6 +568,7 @@
       reader.readAsDataURL(file);
     }
 
+    // Alterna entre Marcos, Thiare, Catalina y Byron al presionar el botón de simulación
     function simularReconocidoEquipo() {
       const rutElegido = rutsEquipoDemo[indiceDemoEquipo % rutsEquipoDemo.length];
       indiceDemoEquipo++;
