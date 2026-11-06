@@ -5,37 +5,46 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>Hub Providencia · Control de Acceso & Caracterización</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
   <style>
     body { background-color: #0b1120; color: #f8fafc; font-family: system-ui, -apple-system, sans-serif; }
-    #reader video { object-fit: cover !important; border-radius: 0.75rem; transition: transform 0.15s ease-out; }
     .scan-box {
       position: relative;
       overflow: hidden;
       border-radius: 1rem;
       background: #000;
     }
-    .corner-guide {
+    #videoPreview {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transform-origin: center center;
+      transition: transform 0.1s ease-out;
+    }
+    .target-frame {
       position: absolute;
       inset: 18%;
-      border: 2px solid rgba(255,255,255,0.25);
+      border: 2px solid rgba(56, 189, 248, 0.75);
       border-radius: 0.75rem;
+      box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.45);
       pointer-events: none;
       z-index: 20;
     }
-    .corner-guide::before, .corner-guide::after {
-      content: "";
+    .scan-laser {
       position: absolute;
-      width: 28px;
-      height: 28px;
-      border-color: #38bdf8;
-      border-style: solid;
+      left: 5%;
+      right: 5%;
+      height: 2px;
+      background: #38bdf8;
+      box-shadow: 0 0 8px #38bdf8;
+      animation: scanMove 2s infinite ease-in-out;
     }
-    .corner-guide::before { top: -2px; left: -2px; border-width: 4px 0 0 4px; border-top-left-radius: 8px; }
-    .corner-guide::after { bottom: -2px; right: -2px; border-width: 0 4px 4px 0; border-bottom-right-radius: 8px; }
+    @keyframes scanMove {
+      0%, 100% { top: 8%; }
+      50% { top: 92%; }
+    }
   </style>
 </head>
 <body class="min-h-screen pb-12">
@@ -50,7 +59,10 @@
           </div>
           <div>
             <p class="text-[11px] font-bold tracking-wider uppercase text-emerald-400">Municipalidad de Providencia</p>
-            <h1 class="text-base sm:text-lg font-bold text-white leading-tight">Hub Providencia · Acceso Ágil QR</h1>
+            <div class="inline-block px-2.5 py-0.5 my-0.5 rounded-full bg-slate-800/90 border border-slate-700 text-[11px] text-slate-300">
+              Equipo Capstonersitos | Marcos, Thiare, Catalina, Byron
+            </div>
+            <h1 class="text-base sm:text-lg font-bold text-white leading-tight">Hub Providencia · Sistema de Caracterización y Acceso Ágil</h1>
           </div>
         </div>
         <button onclick="probarConexionNube()" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-medium text-sky-300 flex items-center gap-1.5">
@@ -59,7 +71,7 @@
       </div>
 
       <!-- Barra de Estado Google Sheets -->
-      <div id="cloudStatusBanner" class="flex items-center justify-between px-3 py-1.5 rounded-lg bg-emerald-950/60 border border-emerald-700/50 text-xs">
+      <div class="flex items-center justify-between px-3 py-1.5 rounded-lg bg-emerald-950/60 border border-emerald-700/50 text-xs">
         <div class="flex items-center gap-2">
           <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
           <span id="cloudStatusText" class="text-emerald-300 font-medium">Sincronizado con Google Sheets (/exec activo)</span>
@@ -88,49 +100,44 @@
     <section id="tab-acceso" class="space-y-4">
       <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
 
-        <!-- Columna Izquierda: Lector de Cámara Mejorado -->
+        <!-- Columna Izquierda: Lector de Cámara con Recorte Real en el Zoom -->
         <div class="lg:col-span-7 bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-3">
           <div class="flex items-center justify-between">
             <h2 class="text-sm font-bold text-white flex items-center gap-2">
               <i class="fa-solid fa-camera text-sky-400"></i> Lector Óptico Cédula Chilena
             </h2>
-            <span class="text-[11px] bg-sky-500/10 text-sky-300 border border-sky-500/20 px-2 py-0.5 rounded-full">
-              Foco HD + Zoom
+            <span id="scanPulseText" class="text-[11px] bg-sky-500/10 text-sky-300 border border-sky-500/20 px-2 py-0.5 rounded-full font-mono">
+              Motor Dual HD
             </span>
           </div>
 
-          <!-- Guía rápida para evitar desenfoque en iPhone -->
-          <div class="bg-amber-500/10 border border-amber-500/30 rounded-xl p-2.5 text-xs text-amber-200 flex items-start gap-2">
-            <i class="fa-solid fa-wand-magic-sparkles text-amber-400 mt-0.5"></i>
-            <div>
-              <strong>Truco para iPhone / Celular:</strong> Mantén el carnet a <strong>15 cm de distancia</strong> (donde el texto se vea nítido) y usa la barra de <strong>Zoom 2x</strong> de abajo para acercar el QR sin perder enfoque.
+          <!-- Visor de Cámara Directo -->
+          <div class="scan-box aspect-square sm:aspect-[4/3] w-full relative flex items-center justify-center border border-slate-700">
+            <video id="videoPreview" playsinline muted></video>
+            <div id="targetOverlay" class="target-frame hidden">
+              <div class="scan-laser"></div>
             </div>
-          </div>
 
-          <!-- Visor de Cámara -->
-          <div class="scan-box aspect-[4/3] w-full relative flex items-center justify-center border border-slate-700">
-            <div id="reader" class="w-full h-full"></div>
-            <div class="corner-guide"></div>
-            <div id="cameraPlaceholder" class="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/90 z-10 p-6 text-center">
+            <div id="cameraPlaceholder" class="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/95 z-30 p-6 text-center">
               <div class="w-14 h-14 rounded-full bg-slate-900 border border-slate-700 flex items-center justify-center text-sky-400 mb-3">
                 <i class="fa-solid fa-qrcode text-2xl"></i>
               </div>
-              <p class="text-sm font-semibold text-white">Cámara en espera</p>
-              <p class="text-xs text-slate-400 mt-1">Presiona el botón azul para activar la cámara trasera o usa el modo Foto Macro.</p>
+              <p class="text-sm font-semibold text-white">Escáner QR de Alta Densidad</p>
+              <p class="text-xs text-slate-400 mt-1">Encuadra el QR a unos 15 cm con Zoom 2.5x o 3.0x y lo leerá al instante.</p>
             </div>
           </div>
 
-          <!-- Control de Zoom (Crucial para evitar desenfoque de cerca) -->
+          <!-- Control de Zoom (Recorta de verdad el centro del sensor HD) -->
           <div id="zoomControls" class="hidden bg-slate-950 p-3 rounded-xl border border-slate-800 space-y-2">
             <div class="flex justify-between text-xs">
-              <span class="text-slate-300 font-medium"><i class="fa-solid fa-magnifying-glass-plus text-sky-400 mr-1"></i> Zoom Óptico/Digital (Aleja el carnet a 15 cm):</span>
-              <span id="zoomValueLabel" class="font-mono font-bold text-sky-400">2.0x</span>
+              <span class="text-slate-300 font-medium"><i class="fa-solid fa-magnifying-glass-plus text-sky-400 mr-1"></i> Zoom de Recorte Real (Aleja a 15 cm):</span>
+              <span id="zoomValueLabel" class="font-mono font-bold text-sky-400">2.5x</span>
             </div>
-            <input id="zoomSlider" type="range" min="1" max="3" step="0.1" value="2.0" oninput="aplicarZoom(this.value)" class="w-full accent-sky-500 cursor-pointer" />
+            <input id="zoomSlider" type="range" min="1" max="3.5" step="0.1" value="2.5" oninput="aplicarZoom(this.value)" class="w-full accent-sky-500 cursor-pointer" />
             <div class="flex justify-between text-[10px] text-slate-500">
-              <span>1.0x (Normal)</span>
-              <span>2.0x (Recomendado Carnet)</span>
-              <span>3.0x (Macro)</span>
+              <span>1.0x</span>
+              <span>2.5x (Ideal Carnet)</span>
+              <span>3.5x (Macro)</span>
             </div>
           </div>
 
@@ -143,10 +150,10 @@
               <i class="fa-solid fa-video-slash"></i> Detener Cámara
             </button>
 
-            <!-- Botón Infalible para iOS: Cámara Nativa con Auto-Macro -->
+            <!-- Botón Foto Macro / Subir Captura -->
             <label class="w-full py-3 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 cursor-pointer text-center shadow-lg">
-              <i class="fa-solid fa-camera-rotate"></i> Modo Macro Nativo (Foto QR)
-              <input type="file" accept="image/*" capture="environment" class="hidden" onchange="escanearFotoNativa(event)" />
+              <i class="fa-solid fa-camera-rotate"></i> Foto QR / Subir Captura
+              <input type="file" accept="image/*" class="hidden" onchange="escanearFotoNativa(event)" />
             </label>
           </div>
 
@@ -162,7 +169,7 @@
           </div>
         </div>
 
-        <!-- Columna Derecha: Panel Dinámico de Respuesta (Check-in o Enrolamiento) -->
+        <!-- Columna Derecha: Panel Dinámico de Respuesta -->
         <div class="lg:col-span-5 space-y-4">
 
           <!-- Estado Inicial -->
@@ -171,7 +178,7 @@
               <i class="fa-solid fa-id-badge text-xl"></i>
             </div>
             <h3 class="text-base font-bold text-white">Esperando lectura de Cédula</h3>
-            <p class="text-xs text-slate-400">Al escanear el código QR del carnet chileno, el sistema extraerá únicamente el RUN, descartará el número de serie y verificará si el visitante ya está enrolado.</p>
+            <p class="text-xs text-slate-400">Al detectar el código QR dentro del recuadro celeste, el sistema vibrará, extraerá el RUN descartando el número de serie y abrirá tu ficha.</p>
           </div>
 
           <!-- PANEL A: USUARIO RECURRENTE (Check-in en 2 segundos) -->
@@ -234,7 +241,7 @@
             <div class="space-y-2.5">
               <div>
                 <label class="text-xs text-slate-300 font-medium">Nombre Completo *</label>
-                <input id="enrNombre" type="text" placeholder="Ej: Marcos Quilapán" class="w-full mt-1 bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white" />
+                <input id="enrNombre" type="text" placeholder="Ej: Thiare / Catalina / Byron" class="w-full mt-1 bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white" />
               </div>
               <div>
                 <label class="text-xs text-slate-300 font-medium">Teléfono de Contacto *</label>
@@ -275,17 +282,17 @@
             </div>
           </div>
 
-          <!-- Simulador Demo en Vivo (Incluye tu Carnet Real por si quieres probar con 1 clic) -->
+          <!-- Simulador Demo en Vivo -->
           <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-2.5">
             <div class="flex items-center justify-between">
-              <span class="text-xs font-bold text-slate-200"><i class="fa-solid fa-flask text-sky-400 mr-1"></i> Simulador Demo (Envía a Google Sheets)</span>
+              <span class="text-xs font-bold text-slate-200"><i class="fa-solid fa-flask text-sky-400 mr-1"></i> Simulador Demo en Vivo (Envía a Google Sheets)</span>
               <span class="text-[10px] text-emerald-400 font-semibold">100% Funcional</span>
             </div>
-            <button onclick="simularEscaneoCarnet('https://portal.sidiv.registrocivil.cl/usuarios-portal/pages/DocumentRequestStatus.xhtml?RUN=21132923-8&type=CEDULA&serial=529528772')" class="w-full py-2 px-3 rounded-xl bg-sky-500/15 hover:bg-sky-500/25 border border-sky-500/30 text-left text-xs text-sky-200 transition">
-              <strong>a) Simular Lectura de tu Carnet (21.132.923-8):</strong> Extrae el RUN de la URL oficial del Registro Civil y descarta serie.
+            <button onclick="simularReconocidoEquipo()" class="w-full py-2 px-3 rounded-xl bg-sky-500/15 hover:bg-sky-500/25 border border-sky-500/30 text-left text-xs text-sky-200 transition">
+              <strong>a) Simular QR Carnet: Usuario Ya Enrolado:</strong> Reconoce a Marcos, Thiare, Catalina o Byron en 2 seg y guarda en Google Sheets.
             </button>
             <button onclick="simularEscaneoCarnet('https://portal.sidiv.registrocivil.cl/usuarios-portal/pages/DocumentRequestStatus.xhtml?RUN=19845120-K&type=CEDULA&serial=411998231')" class="w-full py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-left text-xs text-slate-300 transition">
-              <strong>b) Simular Visitante Nuevo:</strong> Abre ficha de Enrolamiento Único.
+              <strong>b) Simular QR Carnet: Visitante Nuevo:</strong> Abre ficha de Enrolamiento Único.
             </button>
           </div>
 
@@ -361,21 +368,31 @@
     // URL OFICIAL DE TU GOOGLE APPS SCRIPT (/exec)
     const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycby9it1egYMQ98BAMxDQIkmtXL8m_kmd7lt2m9FT42K63ZuwbcPjmIl_osOxenT3FkmKMQ/exec";
 
-    // Base local inicial
-    let padronUsuarios = JSON.parse(localStorage.getItem("hub_padron_v2")) || {
-      "20456789-1": { idAnonimo: "USR-8F92A1", nombre: "Bastián Morales", telefono: "+56 9 8765 4321", perfil: "Estudiante" },
-      "19345678-2": { idAnonimo: "USR-3C41B9", nombre: "Vicente Rojas", telefono: "+56 9 7654 3210", perfil: "Startup" }
+    // Base local inicial con Marcos, Thiare, Catalina y Byron
+    let padronUsuarios = JSON.parse(localStorage.getItem("hub_padron_v3")) || {
+      "21132923-8": { idAnonimo: "USR-7A21M9", nombre: "Marcos", telefono: "+56 9 9123 4567", perfil: "Estudiante" },
+      "20456789-1": { idAnonimo: "USR-8F92A1", nombre: "Thiare", telefono: "+56 9 8765 4321", perfil: "Emprendedor" },
+      "19345678-2": { idAnonimo: "USR-3C41B9", nombre: "Catalina", telefono: "+56 9 7654 3210", perfil: "Startup" },
+      "20987654-3": { idAnonimo: "USR-5D19C4", nombre: "Byron", telefono: "+56 9 6543 2109", perfil: "Estudiante" }
     };
 
-    let historialFlujo = JSON.parse(localStorage.getItem("hub_flujo_v2")) || [
-      { fecha: new Date().toLocaleTimeString(), idAnonimo: "USR-8F92A1", perfil: "Estudiante", espacio: "Cowork", tipoIngreso: "Recurrente QR" }
+    let historialFlujo = JSON.parse(localStorage.getItem("hub_flujo_v3")) || [
+      { fecha: new Date().toLocaleTimeString(), idAnonimo: "USR-7A21M9", perfil: "Estudiante", espacio: "Cowork", tipoIngreso: "Recurrente QR" },
+      { fecha: new Date().toLocaleTimeString(), idAnonimo: "USR-8F92A1", perfil: "Emprendedor", espacio: "Sala de Reuniones", tipoIngreso: "Recurrente QR" }
     ];
 
-    let html5QrCode = null;
+    let indiceDemoEquipo = 0;
+    const rutsEquipoDemo = ["21132923-8", "20456789-1", "19345678-2", "20987654-3"];
+
+    let videoStream = null;
+    let scanInterval = null;
+    let currentZoom = 2.5;
     let rutActualPendiente = null;
     let chartEsp = null, chartPerf = null;
+    let nativeDetector = ("BarcodeDetector" in window) ? new BarcodeDetector({ formats: ["qr_code"] }) : null;
+    const scanCanvas = document.createElement("canvas");
+    const scanCtx = scanCanvas.getContext("2d", { willReadFrequently: true });
 
-    // Función Hash determinista para seudonimizar el RUT
     function generarHashAnonimo(rutLimpio) {
       let hash = 2166136261;
       const str = "HUB_SALT_" + rutLimpio.toUpperCase();
@@ -386,14 +403,11 @@
       return "USR-" + (hash >>> 0).toString(16).toUpperCase().padStart(6, "0").slice(0, 6);
     }
 
-    // Extractor universal de RUT desde QR del Registro Civil o texto
     function extraerRutDesdeQR(textoQR) {
       const texto = decodeURIComponent(textoQR.trim());
-      // 1. Buscar parámetro RUN=12345678-9 en la URL del Registro Civil
       const matchRunParam = texto.match(/RUN=([0-9]{7,8}-?[0-9kK])/i);
       if (matchRunParam) return formatearRut(matchRunParam[1]);
 
-      // 2. Buscar cualquier patrón de RUT chileno en el texto
       const matchGeneral = texto.match(/\b([0-9]{1,2}\.?[0-9]{3}\.?[0-9]{3}-?[0-9kK])\b/i);
       if (matchGeneral) return formatearRut(matchGeneral[1]);
 
@@ -406,81 +420,106 @@
       return limpio.slice(0, -1) + "-" + limpio.slice(-1);
     }
 
-    // Iniciar cámara pidiendo alta resolución + zoom para evitar el desenfoque de cerca en iPhone
+    // MOTOR DE CÁMARA DIRECTO CON RECORTE REAL EN EL ZOOM
     async function iniciarCamara() {
-      document.getElementById("cameraPlaceholder").classList.add("hidden");
-      document.getElementById("btnStartCam").classList.add("hidden");
-      document.getElementById("btnStopCam").classList.remove("hidden");
-      document.getElementById("zoomControls").classList.remove("hidden");
-
-      if (html5QrCode) {
-        try { await html5QrCode.stop(); } catch (e) {}
-      }
-
-      html5QrCode = new Html5Qrcode("reader", {
-        experimentalFeatures: { useBarCodeDetectorIfSupported: true }
-      });
-
-      const config = {
-        fps: 20,
-        qrbox: { width: 240, height: 240 },
-        videoConstraints: {
-          facingMode: { ideal: "environment" },
-          width: { ideal: 1920 },
-          height: { ideal: 1080 }
-        }
-      };
+      detenerCamara();
+      const video = document.getElementById("videoPreview");
 
       try {
-        await html5QrCode.start(
-          { facingMode: "environment" },
-          config,
-          (decodedText) => {
-            if (navigator.vibrate) navigator.vibrate(100);
-            procesarLecturaQR(decodedText);
-          },
-          () => {}
-        );
-        // Aplicar zoom 2.0x por defecto tras medio segundo para que enfoque a 15 cm
-        setTimeout(() => aplicarZoom(2.0), 500);
+        videoStream = await navigator.mediaDevices.getUserMedia({
+          audio: false,
+          video: {
+            facingMode: { ideal: "environment" },
+            width: { ideal: 1920 },
+            height: { ideal: 1080 }
+          }
+        });
+
+        video.srcObject = videoStream;
+        await video.play();
+
+        document.getElementById("cameraPlaceholder").classList.add("hidden");
+        document.getElementById("targetOverlay").classList.remove("hidden");
+        document.getElementById("btnStartCam").classList.add("hidden");
+        document.getElementById("btnStopCam").classList.remove("hidden");
+        document.getElementById("zoomControls").classList.remove("hidden");
+
+        aplicarZoom(document.getElementById("zoomSlider").value);
+
+        let frameCount = 0;
+        scanInterval = setInterval(async () => {
+          if (video.readyState !== video.HAVE_ENOUGH_DATA) return;
+          frameCount++;
+
+          const vw = video.videoWidth;
+          const vh = video.videoHeight;
+          if (!vw || !vh) return;
+
+          const minDim = Math.min(vw, vh);
+          const cropSize = Math.floor(minDim / currentZoom);
+          const sx = Math.floor((vw - cropSize) / 2);
+          const sy = Math.floor((vh - cropSize) / 2);
+
+          scanCanvas.width = 500;
+          scanCanvas.height = 500;
+
+          scanCtx.filter = (frameCount % 2 === 0) ? "contrast(1.9) brightness(1.08) grayscale(1)" : "none";
+          scanCtx.drawImage(video, sx, sy, cropSize, cropSize, 0, 0, 500, 500);
+
+          if (nativeDetector) {
+            try {
+              const barcodes = await nativeDetector.detect(scanCanvas);
+              if (barcodes.length > 0 && barcodes[0].rawValue) {
+                exitoEscaneo(barcodes[0].rawValue);
+                return;
+              }
+            } catch (e) {}
+          }
+
+          const imgData = scanCtx.getImageData(0, 0, 500, 500);
+          const code = jsQR(imgData.data, 500, 500, { inversionAttempts: "attemptBoth" });
+          if (code && code.data) {
+            exitoEscaneo(code.data);
+          }
+        }, 90);
+
       } catch (err) {
-        alert("No se pudo iniciar la cámara en vivo. Usa el botón verde 'Modo Macro Nativo (Foto QR)'.");
+        alert("No se pudo abrir la cámara en vivo. Usa el botón verde 'Foto QR / Subir Captura'.");
         detenerCamara();
       }
     }
 
-    async function detenerCamara() {
-      if (html5QrCode) {
-        try { await html5QrCode.stop(); } catch (e) {}
+    function exitoEscaneo(rawText) {
+      if (navigator.vibrate) navigator.vibrate(120);
+      detenerCamara();
+      procesarLecturaQR(rawText);
+    }
+
+    function detenerCamara() {
+      if (scanInterval) {
+        clearInterval(scanInterval);
+        scanInterval = null;
+      }
+      if (videoStream) {
+        videoStream.getTracks().forEach(t => t.stop());
+        videoStream = null;
       }
       document.getElementById("cameraPlaceholder").classList.remove("hidden");
+      document.getElementById("targetOverlay").classList.add("hidden");
       document.getElementById("btnStartCam").classList.remove("hidden");
       document.getElementById("btnStopCam").classList.add("hidden");
       document.getElementById("zoomControls").classList.add("hidden");
     }
 
-    // Aplica zoom por hardware si el navegador lo soporta y zoom CSS de respaldo
     function aplicarZoom(valor) {
-      document.getElementById("zoomValueLabel").innerText = parseFloat(valor).toFixed(1) + "x";
-      const videoElem = document.querySelector("#reader video");
-      if (!videoElem) return;
-
-      try {
-        const track = videoElem.srcObject?.getVideoTracks()?.[0];
-        const caps = track?.getCapabilities ? track.getCapabilities() : {};
-        if (caps.zoom) {
-          const z = Math.min(Math.max(valor, caps.zoom.min), caps.zoom.max);
-          track.applyConstraints({ advanced: [{ zoom: z }] });
-          videoElem.style.transform = "scale(1)";
-          return;
-        }
-      } catch (e) {}
-
-      // Fallback CSS Zoom
-      videoElem.style.transform = `scale(${valor})`;
+      currentZoom = parseFloat(valor);
+      document.getElementById("zoomValueLabel").innerText = currentZoom.toFixed(1) + "x";
+      const video = document.getElementById("videoPreview");
+      if (video) {
+        video.style.transform = `scale(${currentZoom})`;
+      }
     }
 
-    // Modo Foto Macro Nativa de iOS (Usa la app Cámara oficial del iPhone con lente Macro)
     function escanearFotoNativa(event) {
       const file = event.target.files[0];
       if (!file) return;
@@ -491,22 +530,50 @@
         img.onload = function() {
           const canvas = document.createElement("canvas");
           const ctx = canvas.getContext("2d");
-          canvas.width = img.width;
-          canvas.height = img.height;
-          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-          const code = jsQR(imageData.data, imageData.width, imageData.height, {
-            inversionAttempts: "dontInvert"
-          });
-          if (code && code.data) {
-            procesarLecturaQR(code.data);
-          } else {
-            alert("No se detectó el QR en la foto. Asegúrate de enfocar solo el código QR trasero del carnet.");
+
+          const intentos = [
+            { crop: 1.0, filter: "none" },
+            { crop: 0.65, filter: "contrast(1.8) grayscale(1)" },
+            { crop: 0.45, filter: "contrast(2.0) brightness(1.1) grayscale(1)" }
+          ];
+
+          for (const intento of intentos) {
+            const w = Math.floor(img.width * intento.crop);
+            const h = Math.floor(img.height * intento.crop);
+            const sx = Math.floor((img.width - w) / 2);
+            const sy = Math.floor((img.height - h) / 2);
+
+            canvas.width = 800;
+            canvas.height = Math.floor(800 * (h / w));
+            ctx.filter = intento.filter;
+            ctx.drawImage(img, sx, sy, w, h, 0, 0, canvas.width, canvas.height);
+
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const code = jsQR(imageData.data, imageData.width, imageData.height, {
+              inversionAttempts: "attemptBoth"
+            });
+
+            if (code && code.data) {
+              procesarLecturaQR(code.data);
+              event.target.value = "";
+              return;
+            }
           }
+
+          alert("No se detectó el QR en la imagen. Asegúrate de que el código QR esté centrado y nítido.");
+          event.target.value = "";
         };
         img.src = e.target.result;
       };
       reader.readAsDataURL(file);
+    }
+
+    // Alterna entre Marcos, Thiare, Catalina y Byron al presionar el botón de simulación
+    function simularReconocidoEquipo() {
+      const rutElegido = rutsEquipoDemo[indiceDemoEquipo % rutsEquipoDemo.length];
+      indiceDemoEquipo++;
+      const url = `https://portal.sidiv.registrocivil.cl/usuarios-portal/pages/DocumentRequestStatus.xhtml?RUN=${rutElegido}&type=CEDULA&serial=529528772`;
+      procesarLecturaQR(url);
     }
 
     function simularEscaneoCarnet(urlSimulada) {
@@ -522,11 +589,10 @@
     function procesarLecturaQR(texto) {
       const rut = extraerRutDesdeQR(texto);
       if (!rut) {
-        alert("Lectura recibida, pero no contiene un formato de RUN válido: " + texto);
+        alert("Código leído, pero no contiene un RUN chileno válido:\n" + texto);
         return;
       }
 
-      detenerCamara();
       rutActualPendiente = rut;
       const hashId = generarHashAnonimo(rut);
 
@@ -583,7 +649,7 @@
 
       const idAnonimo = generarHashAnonimo(rutActualPendiente);
       padronUsuarios[rutActualPendiente] = { idAnonimo, nombre, telefono, perfil };
-      localStorage.setItem("hub_padron_v2", JSON.stringify(padronUsuarios));
+      localStorage.setItem("hub_padron_v3", JSON.stringify(padronUsuarios));
 
       registrarEvento({
         esNuevo: true,
@@ -605,7 +671,7 @@
         espacio: payload.espacio,
         tipoIngreso: payload.tipoIngreso
       });
-      localStorage.setItem("hub_flujo_v2", JSON.stringify(historialFlujo));
+      localStorage.setItem("hub_flujo_v3", JSON.stringify(historialFlujo));
       actualizarTablasYGraficos();
 
       document.getElementById("panelRecurrente").classList.add("hidden");
@@ -639,9 +705,9 @@
       enviarAGoogleSheets({
         esNuevo: false,
         rut: "21132923-8",
-        idAnonimo: "USR-TEST01",
-        nombre: "Prueba Conexión Capstonersitos",
-        telefono: "+56 9 0000 0000",
+        idAnonimo: "USR-7A21M9",
+        nombre: "Marcos (Prueba Capstonersitos)",
+        telefono: "+56 9 9123 4567",
         perfil: "Estudiante",
         espacio: "Cowork",
         tipoIngreso: "Test Nube"
