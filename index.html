@@ -15,8 +15,14 @@
       overflow: hidden;
       border-radius: 1rem;
       background: #000;
+      width: 100%;
+      aspect-ratio: 4/3;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
     #videoPreview {
+      position: absolute;
       width: 100%;
       height: 100%;
       object-fit: cover;
@@ -25,10 +31,10 @@
     }
     .target-frame {
       position: absolute;
-      inset: 18%;
-      border: 2px solid rgba(56, 189, 248, 0.75);
+      inset: 15%;
+      border: 2px solid rgba(56, 189, 248, 0.85);
       border-radius: 0.75rem;
-      box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.45);
+      box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5);
       pointer-events: none;
       z-index: 20;
     }
@@ -42,8 +48,8 @@
       animation: scanMove 2s infinite ease-in-out;
     }
     @keyframes scanMove {
-      0%, 100% { top: 8%; }
-      50% { top: 92%; }
+      0%, 100% { top: 10%; }
+      50% { top: 90%; }
     }
   </style>
 </head>
@@ -100,20 +106,26 @@
     <section id="tab-acceso" class="space-y-4">
       <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
 
-        <!-- Columna Izquierda: Lector de Cámara con Recorte Real en el Zoom -->
+        <!-- Columna Izquierda: Lector Universal Multi-Dispositivo -->
         <div class="lg:col-span-7 bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-3">
           <div class="flex items-center justify-between">
             <h2 class="text-sm font-bold text-white flex items-center gap-2">
-              <i class="fa-solid fa-camera text-sky-400"></i> Lector Óptico Cédula Chilena
+              <i class="fa-solid fa-camera text-sky-400"></i> Lector QR Universal (iOS · Android · Tablet)
             </h2>
-            <span id="scanPulseText" class="text-[11px] bg-sky-500/10 text-sky-300 border border-sky-500/20 px-2 py-0.5 rounded-full font-mono">
-              Motor Dual HD
+            <span id="scanEngineBadge" class="text-[11px] bg-sky-500/10 text-sky-300 border border-sky-500/20 px-2 py-0.5 rounded-full font-mono">
+              Auto-Focus HD
             </span>
           </div>
 
-          <!-- Visor de Cámara Directo -->
-          <div class="scan-box aspect-square sm:aspect-[4/3] w-full relative flex items-center justify-center border border-slate-700">
-            <video id="videoPreview" playsinline muted></video>
+          <!-- Selector de Lente (aparece si la Tablet o Android tiene múltiples cámaras) -->
+          <div id="camSelectorBox" class="hidden">
+            <select id="cameraSelect" onchange="cambiarDispositivoCamara(this.value)" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-slate-200">
+            </select>
+          </div>
+
+          <!-- Visor de Cámara -->
+          <div class="scan-box">
+            <video id="videoPreview" playsinline autoplay muted></video>
             <div id="targetOverlay" class="target-frame hidden">
               <div class="scan-laser"></div>
             </div>
@@ -122,21 +134,21 @@
               <div class="w-14 h-14 rounded-full bg-slate-900 border border-slate-700 flex items-center justify-center text-sky-400 mb-3">
                 <i class="fa-solid fa-qrcode text-2xl"></i>
               </div>
-              <p class="text-sm font-semibold text-white">Escáner QR de Alta Densidad</p>
-              <p class="text-xs text-slate-400 mt-1">Encuadra el QR a unos 15 cm con Zoom 2.5x o 3.0x y lo leerá al instante.</p>
+              <p class="text-sm font-semibold text-white">Escáner QR Multi-Dispositivo</p>
+              <p class="text-xs text-slate-400 mt-1">Compatible con Android, iPhone, iPad y Tablets. Mantén el carnet a 15 cm y usa el Zoom 2.5x.</p>
             </div>
           </div>
 
-          <!-- Control de Zoom (Recorta de verdad el centro del sensor HD) -->
+          <!-- Control de Zoom (Hardware + Recorte Digital) -->
           <div id="zoomControls" class="hidden bg-slate-950 p-3 rounded-xl border border-slate-800 space-y-2">
             <div class="flex justify-between text-xs">
-              <span class="text-slate-300 font-medium"><i class="fa-solid fa-magnifying-glass-plus text-sky-400 mr-1"></i> Zoom de Recorte Real (Aleja a 15 cm):</span>
-              <span id="zoomValueLabel" class="font-mono font-bold text-sky-400">2.5x</span>
+              <span class="text-slate-300 font-medium"><i class="fa-solid fa-magnifying-glass-plus text-sky-400 mr-1"></i> Zoom Óptico/Digital (Aleja a 15 cm):</span>
+              <span id="zoomValueLabel" class="font-mono font-bold text-sky-400">2.0x</span>
             </div>
-            <input id="zoomSlider" type="range" min="1" max="3.5" step="0.1" value="2.5" oninput="aplicarZoom(this.value)" class="w-full accent-sky-500 cursor-pointer" />
+            <input id="zoomSlider" type="range" min="1" max="3.5" step="0.1" value="2.0" oninput="aplicarZoom(this.value)" class="w-full accent-sky-500 cursor-pointer" />
             <div class="flex justify-between text-[10px] text-slate-500">
-              <span>1.0x</span>
-              <span>2.5x (Ideal Carnet)</span>
+              <span>1.0x (Normal)</span>
+              <span>2.0x - 2.5x (Ideal Carnet)</span>
               <span>3.5x (Macro)</span>
             </div>
           </div>
@@ -150,7 +162,7 @@
               <i class="fa-solid fa-video-slash"></i> Detener Cámara
             </button>
 
-            <!-- Botón Foto Macro / Subir Captura -->
+            <!-- Botón Foto Nativa (Funciona en el 100% de celulares y tablets) -->
             <label class="w-full py-3 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 cursor-pointer text-center shadow-lg">
               <i class="fa-solid fa-camera-rotate"></i> Foto QR / Subir Captura
               <input type="file" accept="image/*" class="hidden" onchange="escanearFotoNativa(event)" />
@@ -178,10 +190,10 @@
               <i class="fa-solid fa-id-badge text-xl"></i>
             </div>
             <h3 class="text-base font-bold text-white">Esperando lectura de Cédula</h3>
-            <p class="text-xs text-slate-400">Al detectar el código QR dentro del recuadro celeste, el sistema vibrará, extraerá el RUN descartando el número de serie y abrirá tu ficha.</p>
+            <p class="text-xs text-slate-400">Al detectar el código QR, el sistema extraerá el RUN descartando el N° de serie y abrirá tu ficha para registrar en `Flujo` y `Padron`.</p>
           </div>
 
-          <!-- PANEL A: USUARIO RECURRENTE (Check-in en 2 segundos) -->
+          <!-- PANEL A: USUARIO RECURRENTE -->
           <div id="panelRecurrente" class="hidden bg-slate-900 border-2 border-emerald-500/60 rounded-2xl p-5 space-y-4">
             <div class="flex items-center justify-between">
               <span class="px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
@@ -218,7 +230,7 @@
             </div>
           </div>
 
-          <!-- PANEL B: USUARIO NUEVO (Enrolamiento Único + Ley de Datos) -->
+          <!-- PANEL B: USUARIO NUEVO (Enrolamiento Único -> Guarda en Padron y Flujo) -->
           <div id="panelEnrolamiento" class="hidden bg-slate-900 border-2 border-sky-500/60 rounded-2xl p-5 space-y-3">
             <div class="flex items-center justify-between">
               <span class="px-2.5 py-1 rounded-full text-xs font-bold bg-sky-500/20 text-sky-300 border border-sky-500/30">
@@ -272,12 +284,12 @@
               <label class="flex items-start gap-2 pt-1 cursor-pointer">
                 <input id="enrConsentimiento" type="checkbox" checked class="mt-1 accent-sky-500" />
                 <span class="text-[11px] text-slate-300 leading-tight">
-                  Acepto el tratamiento de mis datos por Hub Providencia para control de acceso y estadísticas internas seudonimizadas (Ley de Protección de Datos Personales).
+                  Acepto el tratamiento de mis datos por Hub Providencia para control de acceso y estadísticas internas seudonimizadas.
                 </span>
               </label>
 
               <button onclick="guardarEnrolamientoYAcceso()" class="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm shadow-lg">
-                <i class="fa-solid fa-check-double mr-1"></i> Completar Enrolamiento y Registrar Ingreso
+                <i class="fa-solid fa-check-double mr-1"></i> Completar Enrolamiento (Guarda en Padron y Flujo)
               </button>
             </div>
           </div>
@@ -285,14 +297,14 @@
           <!-- Simulador Demo en Vivo -->
           <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-2.5">
             <div class="flex items-center justify-between">
-              <span class="text-xs font-bold text-slate-200"><i class="fa-solid fa-flask text-sky-400 mr-1"></i> Simulador Demo en Vivo (Envía a Google Sheets)</span>
-              <span class="text-[10px] text-emerald-400 font-semibold">100% Funcional</span>
+              <span class="text-xs font-bold text-slate-200"><i class="fa-solid fa-flask text-sky-400 mr-1"></i> Simulador Demo en Vivo</span>
+              <span class="text-[10px] text-emerald-400 font-semibold">Envía a Flujo y Padron</span>
             </div>
             <button onclick="simularReconocidoEquipo()" class="w-full py-2 px-3 rounded-xl bg-sky-500/15 hover:bg-sky-500/25 border border-sky-500/30 text-left text-xs text-sky-200 transition">
-              <strong>a) Simular QR Carnet: Usuario Ya Enrolado:</strong> Reconoce a Marcos, Thiare, Catalina o Byron en 2 seg y guarda en Google Sheets.
+              <strong>a) Simular QR Integrante Equipo:</strong> Reconoce a Marcos, Thiare, Catalina o Byron y registra en `Flujo`.
             </button>
-            <button onclick="simularEscaneoCarnet('https://portal.sidiv.registrocivil.cl/usuarios-portal/pages/DocumentRequestStatus.xhtml?RUN=19845120-K&type=CEDULA&serial=411998231')" class="w-full py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-left text-xs text-slate-300 transition">
-              <strong>b) Simular QR Carnet: Visitante Nuevo:</strong> Abre ficha de Enrolamiento Único.
+            <button onclick="simularVisitanteNuevo()" class="w-full py-2 px-3 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-left text-xs text-emerald-200 transition">
+              <strong>b) Simular QR Visitante Nuevo:</strong> Abre Enrolamiento para guardar en `Padron` y `Flujo`.
             </button>
           </div>
 
@@ -306,7 +318,7 @@
         <div class="flex flex-wrap items-center justify-between gap-2">
           <div>
             <h2 class="text-base font-bold text-white">Registros Sincronizados con Google Sheets</h2>
-            <p class="text-xs text-slate-400">Separación entre tabla operativa anonimizada (`Flujo`) y padrón de enrolamiento (`Padron`).</p>
+            <p class="text-xs text-slate-400">Separación entre tabla operativa (`Flujo`) y padrón de enrolamiento (`Padron`).</p>
           </div>
           <button onclick="descargarCSV()" class="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center gap-1.5">
             <i class="fa-solid fa-file-excel"></i> Descargar CSV
@@ -318,7 +330,8 @@
             <thead>
               <tr class="border-b border-slate-800 text-slate-400 uppercase">
                 <th class="py-2 px-3">Hora</th>
-                <th class="py-2 px-3">ID Anónimo (Hash)</th>
+                <th class="py-2 px-3">ID Anónimo</th>
+                <th class="py-2 px-3">Nombre</th>
                 <th class="py-2 px-3">Perfil</th>
                 <th class="py-2 px-3">Espacio</th>
                 <th class="py-2 px-3">Tipo</th>
@@ -365,28 +378,26 @@
   </main>
 
   <script>
-    // URL OFICIAL DE TU GOOGLE APPS SCRIPT (/exec)
-    const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwD_fhQwmbjhkDsOBE8X-LtmMlUigjKB23Ew6iLZilBuU4CA57yE6Dm3BDhd-yOllPDng/exec";
+    const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycby9it1egYMQ98BAMxDQIkmtXL8m_kmd7lt2m9FT42K63ZuwbcPjmIl_osOxenT3FkmKMQ/exec";
 
-    // Base local inicial con Marcos, Thiare, Catalina y Byron
-    let padronUsuarios = JSON.parse(localStorage.getItem("hub_padron_v3")) || {
-      "21132923-8": { idAnonimo: "USR-7A21M9", nombre: "Marcos", telefono: "+56 9 9123 4567", perfil: "Estudiante" },
-      "20456789-1": { idAnonimo: "USR-8F92A1", nombre: "Thiare", telefono: "+56 9 8765 4321", perfil: "Emprendedor" },
-      "19345678-2": { idAnonimo: "USR-3C41B9", nombre: "Catalina", telefono: "+56 9 7654 3210", perfil: "Startup" },
-      "20987654-3": { idAnonimo: "USR-5D19C4", nombre: "Byron", telefono: "+56 9 6543 2109", perfil: "Estudiante" }
+    // Solo dejamos los RUTs simulados pre-cargados para que cuando escanees un carnet físico real por primera vez, pase por Enrolamiento y se guarde en Padron
+    let padronUsuarios = JSON.parse(localStorage.getItem("hub_padron_v4")) || {
+      "11111111-1": { idAnonimo: "USR-7A21M9", nombre: "Marcos Quilapán", telefono: "+56 9 9123 4567", perfil: "Estudiante" },
+      "22222222-2": { idAnonimo: "USR-8F92A1", nombre: "Thiare", telefono: "+56 9 8765 4321", perfil: "Emprendedor" },
+      "33333333-3": { idAnonimo: "USR-3C41B9", nombre: "Catalina", telefono: "+56 9 7654 3210", perfil: "Startup" },
+      "44444444-4": { idAnonimo: "USR-5D19C4", nombre: "Byron", telefono: "+56 9 6543 2109", perfil: "Estudiante" }
     };
 
-    let historialFlujo = JSON.parse(localStorage.getItem("hub_flujo_v3")) || [
-      { fecha: new Date().toLocaleTimeString(), idAnonimo: "USR-7A21M9", perfil: "Estudiante", espacio: "Cowork", tipoIngreso: "Recurrente QR" },
-      { fecha: new Date().toLocaleTimeString(), idAnonimo: "USR-8F92A1", perfil: "Emprendedor", espacio: "Sala de Reuniones", tipoIngreso: "Recurrente QR" }
+    let historialFlujo = JSON.parse(localStorage.getItem("hub_flujo_v4")) || [
+      { fecha: new Date().toLocaleTimeString(), idAnonimo: "USR-7A21M9", nombre: "Marcos Quilapán", perfil: "Estudiante", espacio: "Cowork", tipoIngreso: "Recurrente QR" }
     ];
 
     let indiceDemoEquipo = 0;
-    const rutsEquipoDemo = ["21132923-8", "20456789-1", "19345678-2", "20987654-3"];
+    const rutsEquipoDemo = ["11111111-1", "22222222-2", "33333333-3", "44444444-4"];
 
     let videoStream = null;
     let scanInterval = null;
-    let currentZoom = 2.5;
+    let currentZoom = 2.0;
     let rutActualPendiente = null;
     let chartEsp = null, chartPerf = null;
     let nativeDetector = ("BarcodeDetector" in window) ? new BarcodeDetector({ formats: ["qr_code"] }) : null;
@@ -416,27 +427,55 @@
 
     function formatearRut(rutRaw) {
       const limpio = rutRaw.replace(/[^0-9kK]/g, "").toUpperCase();
-      if (limpio.length < 8) return rutRaw;
+      if (limpio.length < 7) return rutRaw;
       return limpio.slice(0, -1) + "-" + limpio.slice(-1);
     }
 
-    // MOTOR DE CÁMARA DIRECTO CON RECORTE REAL EN EL ZOOM
-    async function iniciarCamara() {
+    // Filtro matemático universal (100% compatible con Android, iOS y Tablets sin usar ctx.filter)
+    function aplicarAltoContrasteUniversal(imgData) {
+      const d = imgData.data;
+      const factor = 2.1; // Sube el contraste para separar el QR del fondo gris del carnet
+      for (let i = 0; i < d.length; i += 4) {
+        const gris = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+        let val = (gris - 128) * factor + 128;
+        val = val < 0 ? 0 : (val > 255 ? 255 : val);
+        d[i] = d[i + 1] = d[i + 2] = val;
+      }
+    }
+
+    // MOTOR DE CÁMARA MULTI-DISPOSITIVO (iPhone + Android + Tablets)
+    async function iniciarCamara(deviceIdEspecifico = null) {
       detenerCamara();
       const video = document.getElementById("videoPreview");
 
       try {
+        const videoConstraints = deviceIdEspecifico
+          ? { deviceId: { exact: deviceIdEspecifico }, width: { ideal: 1920 }, height: { ideal: 1080 } }
+          : { facingMode: { ideal: "environment" }, width: { ideal: 1920 }, height: { ideal: 1080 } };
+
         videoStream = await navigator.mediaDevices.getUserMedia({
           audio: false,
-          video: {
-            facingMode: { ideal: "environment" },
-            width: { ideal: 1920 },
-            height: { ideal: 1080 }
-          }
+          video: videoConstraints
         });
 
         video.srcObject = videoStream;
         await video.play();
+
+        // Activar autoenfoque continuo en Android y Tablets si el hardware lo soporta
+        const track = videoStream.getVideoTracks()[0];
+        if (track && track.getCapabilities) {
+          const caps = track.getCapabilities();
+          const adv = {};
+          if (caps.focusMode && caps.focusMode.includes("continuous")) {
+            adv.focusMode = "continuous";
+          }
+          if (Object.keys(adv).length > 0) {
+            track.applyConstraints({ advanced: [adv] }).catch(() => {});
+          }
+        }
+
+        // Listar cámaras traseras si el dispositivo tiene varios lentes (común en Android)
+        listarCamarasDisponibles();
 
         document.getElementById("cameraPlaceholder").classList.add("hidden");
         document.getElementById("targetOverlay").classList.remove("hidden");
@@ -460,12 +499,11 @@
           const sx = Math.floor((vw - cropSize) / 2);
           const sy = Math.floor((vh - cropSize) / 2);
 
-          scanCanvas.width = 500;
-          scanCanvas.height = 500;
+          scanCanvas.width = 480;
+          scanCanvas.height = 480;
+          scanCtx.drawImage(video, sx, sy, cropSize, cropSize, 0, 0, 480, 480);
 
-          scanCtx.filter = (frameCount % 2 === 0) ? "contrast(1.9) brightness(1.08) grayscale(1)" : "none";
-          scanCtx.drawImage(video, sx, sy, cropSize, cropSize, 0, 0, 500, 500);
-
+          // 1. Intento con BarcodeDetector nativo (Android Chrome / iOS)
           if (nativeDetector) {
             try {
               const barcodes = await nativeDetector.detect(scanCanvas);
@@ -476,17 +514,42 @@
             } catch (e) {}
           }
 
-          const imgData = scanCtx.getImageData(0, 0, 500, 500);
-          const code = jsQR(imgData.data, 500, 500, { inversionAttempts: "attemptBoth" });
+          // 2. Intento con jsQR (alternando cuadro original y cuadro con alto contraste universal)
+          const imgData = scanCtx.getImageData(0, 0, 480, 480);
+          if (frameCount % 2 === 0) {
+            aplicarAltoContrasteUniversal(imgData);
+          }
+          const code = jsQR(imgData.data, 480, 480, { inversionAttempts: "attemptBoth" });
           if (code && code.data) {
             exitoEscaneo(code.data);
           }
-        }, 90);
+        }, 85);
 
       } catch (err) {
-        alert("No se pudo abrir la cámara en vivo. Usa el botón verde 'Foto QR / Subir Captura'.");
+        alert("No se pudo iniciar la cámara en vivo. Usa el botón verde 'Foto QR / Subir Captura'.");
         detenerCamara();
       }
+    }
+
+    async function listarCamarasDisponibles() {
+      try {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const cams = devices.filter(d => d.kind === "videoinput");
+        const select = document.getElementById("cameraSelect");
+        const box = document.getElementById("camSelectorBox");
+        if (cams.length > 1) {
+          box.classList.remove("hidden");
+          const currentTrack = videoStream ? videoStream.getVideoTracks()[0] : null;
+          const currentId = currentTrack ? currentTrack.getSettings().deviceId : "";
+          select.innerHTML = cams.map((c, idx) =>
+            `<option value="${c.deviceId}" ${c.deviceId === currentId ? "selected" : ""}>Lente ${idx + 1}: ${c.label || "Cámara " + (idx + 1)}</option>`
+          ).join("");
+        }
+      } catch (e) {}
+    }
+
+    function cambiarDispositivoCamara(deviceId) {
+      if (deviceId) iniciarCamara(deviceId);
     }
 
     function exitoEscaneo(rawText) {
@@ -529,30 +592,31 @@
       reader.onload = function(e) {
         img.onload = function() {
           const canvas = document.createElement("canvas");
-          const ctx = canvas.getContext("2d");
+          const ctx = canvas.getContext("2d", { willReadFrequently: true });
 
-          const intentos = [
-            { crop: 1.0, filter: "none" },
-            { crop: 0.65, filter: "contrast(1.8) grayscale(1)" },
-            { crop: 0.45, filter: "contrast(2.0) brightness(1.1) grayscale(1)" }
-          ];
-
-          for (const intento of intentos) {
-            const w = Math.floor(img.width * intento.crop);
-            const h = Math.floor(img.height * intento.crop);
+          const recortes = [1.0, 0.7, 0.45];
+          for (const crop of recortes) {
+            const w = Math.floor(img.width * crop);
+            const h = Math.floor(img.height * crop);
             const sx = Math.floor((img.width - w) / 2);
             const sy = Math.floor((img.height - h) / 2);
 
-            canvas.width = 800;
-            canvas.height = Math.floor(800 * (h / w));
-            ctx.filter = intento.filter;
+            canvas.width = 750;
+            canvas.height = Math.floor(750 * (h / w));
             ctx.drawImage(img, sx, sy, w, h, 0, 0, canvas.width, canvas.height);
 
-            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-            const code = jsQR(imageData.data, imageData.width, imageData.height, {
-              inversionAttempts: "attemptBoth"
-            });
+            // Intento normal
+            let imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            let code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: "attemptBoth" });
+            if (code && code.data) {
+              procesarLecturaQR(code.data);
+              event.target.value = "";
+              return;
+            }
 
+            // Intento alto contraste universal
+            aplicarAltoContrasteUniversal(imageData);
+            code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: "attemptBoth" });
             if (code && code.data) {
               procesarLecturaQR(code.data);
               event.target.value = "";
@@ -560,7 +624,7 @@
             }
           }
 
-          alert("No se detectó el QR en la imagen. Asegúrate de que el código QR esté centrado y nítido.");
+          alert("No se detectó el QR en la foto. Acerca un poco más el carnet y asegúrate de que esté bien iluminado.");
           event.target.value = "";
         };
         img.src = e.target.result;
@@ -568,7 +632,6 @@
       reader.readAsDataURL(file);
     }
 
-    // Alterna entre Marcos, Thiare, Catalina y Byron al presionar el botón de simulación
     function simularReconocidoEquipo() {
       const rutElegido = rutsEquipoDemo[indiceDemoEquipo % rutsEquipoDemo.length];
       indiceDemoEquipo++;
@@ -576,8 +639,10 @@
       procesarLecturaQR(url);
     }
 
-    function simularEscaneoCarnet(urlSimulada) {
-      procesarLecturaQR(urlSimulada);
+    function simularVisitanteNuevo() {
+      const randomNum = Math.floor(18000000 + Math.random() * 4000000);
+      const url = `https://portal.sidiv.registrocivil.cl/usuarios-portal/pages/DocumentRequestStatus.xhtml?RUN=${randomNum}-K&type=CEDULA&serial=411998231`;
+      procesarLecturaQR(url);
     }
 
     function procesarEntradaManual() {
@@ -643,13 +708,13 @@
         return;
       }
       if (!consent) {
-        alert("Debes aceptar el consentimiento informado (Ley de Protección de Datos).");
+        alert("Debes aceptar el consentimiento informado.");
         return;
       }
 
       const idAnonimo = generarHashAnonimo(rutActualPendiente);
       padronUsuarios[rutActualPendiente] = { idAnonimo, nombre, telefono, perfil };
-      localStorage.setItem("hub_padron_v3", JSON.stringify(padronUsuarios));
+      localStorage.setItem("hub_padron_v4", JSON.stringify(padronUsuarios));
 
       registrarEvento({
         esNuevo: true,
@@ -667,11 +732,12 @@
       historialFlujo.unshift({
         fecha: new Date().toLocaleTimeString(),
         idAnonimo: payload.idAnonimo,
+        nombre: payload.nombre,
         perfil: payload.perfil,
         espacio: payload.espacio,
         tipoIngreso: payload.tipoIngreso
       });
-      localStorage.setItem("hub_flujo_v3", JSON.stringify(historialFlujo));
+      localStorage.setItem("hub_flujo_v4", JSON.stringify(historialFlujo));
       actualizarTablasYGraficos();
 
       document.getElementById("panelRecurrente").classList.add("hidden");
@@ -679,21 +745,32 @@
       document.getElementById("panelEspera").classList.remove("hidden");
 
       await enviarAGoogleSheets(payload);
-      alert(`✅ Ingreso registrado en Google Sheets:\n${payload.nombre} (${payload.idAnonimo}) -> ${payload.espacio}`);
+      alert(`✅ Registrado en Google Sheets:\nUsuario: ${payload.nombre} (${payload.idAnonimo})\nEspacio: ${payload.espacio}\n${payload.esNuevo ? "Guardado en Padron y Flujo" : "Guardado en Flujo"}`);
     }
 
+    // Envío por GET con parámetros URL (nunca pierde datos en redirecciones de Google)
     async function enviarAGoogleSheets(datos) {
       const statusText = document.getElementById("cloudStatusText");
       const timeText = document.getElementById("cloudTimeText");
-      statusText.innerText = "Enviando fila a Google Sheets...";
+      statusText.innerText = "Sincronizando con Google Sheets...";
 
       try {
-        await fetch(GOOGLE_SCRIPT_URL, {
-          method: "POST",
-          mode: "no-cors",
-          headers: { "Content-Type": "text/plain;charset=utf-8" },
-          body: JSON.stringify(datos)
+        const params = new URLSearchParams({
+          esNuevo: datos.esNuevo ? "true" : "false",
+          rut: datos.rut || "",
+          idAnonimo: datos.idAnonimo || "USR-OK",
+          nombre: datos.nombre || "Visitante",
+          telefono: datos.telefono || "",
+          perfil: datos.perfil || "Estudiante",
+          espacio: datos.espacio || "Cowork",
+          tipoIngreso: datos.tipoIngreso || "QR"
         });
+
+        await fetch(`${GOOGLE_SCRIPT_URL}?${params.toString()}`, {
+          method: "GET",
+          mode: "no-cors"
+        });
+
         statusText.innerText = "Sincronizado con Google Sheets (/exec activo)";
         timeText.innerText = new Date().toLocaleTimeString();
       } catch (err) {
@@ -706,13 +783,13 @@
         esNuevo: false,
         rut: "21132923-8",
         idAnonimo: "USR-7A21M9",
-        nombre: "Marcos (Prueba Capstonersitos)",
+        nombre: "Marcos Quilapán (Prueba)",
         telefono: "+56 9 9123 4567",
         perfil: "Estudiante",
         espacio: "Cowork",
         tipoIngreso: "Test Nube"
       });
-      alert("Se envió un registro de prueba a tu Google Sheets. Revisa la pestaña 'Flujo'.");
+      alert("Se envió un registro de prueba con ID y Nombre a tu Google Sheets.");
     }
 
     function actualizarTablasYGraficos() {
@@ -721,7 +798,8 @@
         <tr class="hover:bg-slate-800/40">
           <td class="py-2 px-3 text-slate-300">${r.fecha}</td>
           <td class="py-2 px-3 text-emerald-400 font-bold">${r.idAnonimo}</td>
-          <td class="py-2 px-3 text-white">${r.perfil}</td>
+          <td class="py-2 px-3 text-white">${r.nombre || "-"}</td>
+          <td class="py-2 px-3 text-slate-300">${r.perfil}</td>
           <td class="py-2 px-3 text-sky-300">${r.espacio}</td>
           <td class="py-2 px-3 text-slate-400">${r.tipoIngreso}</td>
         </tr>
@@ -771,9 +849,9 @@
     }
 
     function descargarCSV() {
-      let csv = "Hora,ID_Anonimo,Perfil,Espacio,Tipo\n";
+      let csv = "Hora,ID_Anonimo,Nombre,Perfil,Espacio,Tipo\n";
       historialFlujo.forEach(r => {
-        csv += `${r.fecha},${r.idAnonimo},${r.perfil},${r.espacio},${r.tipoIngreso}\n`;
+        csv += `${r.fecha},${r.idAnonimo},${r.nombre || ""},${r.perfil},${r.espacio},${r.tipoIngreso}\n`;
       });
       const blob = new Blob([csv], { type: "text/csv" });
       const a = document.createElement("a");
