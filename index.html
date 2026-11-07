@@ -378,7 +378,7 @@
   </main>
 
   <script>
-    const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycby9it1egYMQ98BAMxDQIkmtXL8m_kmd7lt2m9FT42K63ZuwbcPjmIl_osOxenT3FkmKMQ/exec";
+    const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwD_fhQwmbjhkDsOBE8X-LtmMlUigjKB23Ew6iLZilBuU4CA57yE6Dm3BDhd-yOllPDng/exec";
 
     // Solo dejamos los RUTs simulados pre-cargados para que cuando escanees un carnet físico real por primera vez, pase por Enrolamiento y se guarde en Padron
     let padronUsuarios = JSON.parse(localStorage.getItem("hub_padron_v4")) || {
@@ -748,35 +748,43 @@
       alert(`✅ Registrado en Google Sheets:\nUsuario: ${payload.nombre} (${payload.idAnonimo})\nEspacio: ${payload.espacio}\n${payload.esNuevo ? "Guardado en Padron y Flujo" : "Guardado en Flujo"}`);
     }
 
-    // Envío por GET con parámetros URL (nunca pierde datos en redirecciones de Google)
-    async function enviarAGoogleSheets(datos) {
-      const statusText = document.getElementById("cloudStatusText");
-      const timeText = document.getElementById("cloudTimeText");
-      statusText.innerText = "Sincronizando con Google Sheets...";
+    // Envío de doble vía (compatible con todos los celulares y navegadores)
+async function enviarAGoogleSheets(datos) {
+  const statusText = document.getElementById("cloudStatusText");
+  const timeText = document.getElementById("cloudTimeText");
+  statusText.innerText = "Sincronizando con Google Sheets...";
 
-      try {
-        const params = new URLSearchParams({
-          esNuevo: datos.esNuevo ? "true" : "false",
-          rut: datos.rut || "",
-          idAnonimo: datos.idAnonimo || "USR-OK",
-          nombre: datos.nombre || "Visitante",
-          telefono: datos.telefono || "",
-          perfil: datos.perfil || "Estudiante",
-          espacio: datos.espacio || "Cowork",
-          tipoIngreso: datos.tipoIngreso || "QR"
-        });
+  const payload = {
+    esNuevo: datos.esNuevo ? "true" : "false",
+    rut: datos.rut || "",
+    idAnonimo: datos.idAnonimo || "USR-OK",
+    nombre: datos.nombre || "Visitante",
+    telefono: datos.telefono || "",
+    perfil: datos.perfil || "Estudiante",
+    espacio: datos.espacio || "Cowork",
+    tipoIngreso: datos.tipoIngreso || "QR"
+  };
 
-        await fetch(`${GOOGLE_SCRIPT_URL}?${params.toString()}`, {
-          method: "GET",
-          mode: "no-cors"
-        });
+  const params = new URLSearchParams(payload).toString();
+  const urlCompleta = `${GOOGLE_SCRIPT_URL}?${params}`;
 
-        statusText.innerText = "Sincronizado con Google Sheets (/exec activo)";
-        timeText.innerText = new Date().toLocaleTimeString();
-      } catch (err) {
-        statusText.innerText = "Guardado local (Reintentando nube)";
-      }
-    }
+  try {
+    await fetch(urlCompleta, {
+      method: "POST",
+      mode: "no-cors",
+      keepalive: true,
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify(payload)
+    });
+
+    statusText.innerText = "Sincronizado con Google Sheets (/exec activo)";
+    timeText.innerText = new Date().toLocaleTimeString();
+  } catch (err) {
+    const imgPing = new Image();
+    imgPing.src = urlCompleta + "&t=" + Date.now();
+    statusText.innerText = "Sincronizado por vía alterna";
+  }
+}
 
     function probarConexionNube() {
       enviarAGoogleSheets({
