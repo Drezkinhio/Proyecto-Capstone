@@ -378,7 +378,7 @@
   </main>
 
   <script>
-    const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwVy7aH0oACoDaGVeDHar6KHg9CpQUSHkZi4Y8MgRMvlBWQdE11s25-GwN-J4-6ll9lqw/exec";
+    const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbymtcaVPiiz5TmaO8RwrCo480yTcKPxk4fT_g6WNb9eP8dqRNOpVqn-S4kbEVRl8J7EUA/exec";
 
     // Solo dejamos los RUTs simulados pre-cargados para que cuando escanees un carnet físico real por primera vez, pase por Enrolamiento y se guarde en Padron
     let padronUsuarios = JSON.parse(localStorage.getItem("hub_padron_v4")) || {
@@ -755,15 +755,16 @@ async function enviarAGoogleSheets(datos) {
   statusText.innerText = "Sincronizando con Google Sheets...";
 
   const payload = {
-    esNuevo: datos.esNuevo ? "true" : "false",
-    rut: datos.rut || "",
-    idAnonimo: datos.idAnonimo || "USR-OK",
-    nombre: datos.nombre || "Visitante",
-    telefono: datos.telefono || "",
-    perfil: datos.perfil || "Estudiante",
-    espacio: datos.espacio || "Cowork",
-    tipoIngreso: datos.tipoIngreso || "QR"
-  };
+  esNuevo: datos.esNuevo ? "true" : "false",
+  rut: datos.rut || "",
+  idAnonimo: datos.idAnonimo || "USR-OK",
+  nombre: datos.nombre || "Visitante",
+  // Limpia el '+' y espacios justo antes de enviar a la nube
+  telefono: (datos.telefono || "").toString().replace(/^\+/, "").replace(/\s+/g, ""), 
+  perfil: datos.perfil || "Estudiante",
+  espacio: datos.espacio || "Cowork",
+  tipoIngreso: datos.tipoIngreso || "QR"
+};
 
   const params = new URLSearchParams(payload).toString();
   const urlCompleta = `${GOOGLE_SCRIPT_URL}?${params}`;
