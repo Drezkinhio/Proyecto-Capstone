@@ -378,7 +378,7 @@
   </main>
 
   <script>
-    const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwD_fhQwmbjhkDsOBE8X-LtmMlUigjKB23Ew6iLZilBuU4CA57yE6Dm3BDhd-yOllPDng/exec";
+    const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzn0uv8VqZAWp0d7JDwV23qm-m_9wio-ij-FdfQeo8hVbRFNSg9LWXrf8oYBpd6isUVYg/exec";
 
     // Solo dejamos los RUTs simulados pre-cargados para que cuando escanees un carnet físico real por primera vez, pase por Enrolamiento y se guarde en Padron
     let padronUsuarios = JSON.parse(localStorage.getItem("hub_padron_v4")) || {
@@ -698,7 +698,7 @@
 
     function guardarEnrolamientoYAcceso() {
       const nombre = document.getElementById("enrNombre").value.trim();
-      const telefono = document.getElementById("enrTelefono").value.trim();
+      const telefono = document.getElementById("enrTelefono").value.trim().replace(/^\+/, "").replace(/\s+/g, "");
       const perfil = document.getElementById("enrPerfil").value;
       const espacio = document.getElementById("enrEspacio").value;
       const consent = document.getElementById("enrConsentimiento").checked;
