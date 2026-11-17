@@ -82,6 +82,7 @@ El problema lo vive el equipo de gestión del Hub Providencia (al no tener datos
 - [S11 - Revisión de Propuesta, Viabilidad Operativa y Preparación Entrega 2](bitacora/S11.md)
 - [S12 - Diseño conceptual y simulación inicial de la solución.](bitacora/S12.md)
 - [S13 - Desafío de ingeniería, pitch de solución y prototipo.](bitacora/S13.md)
+- [S14 - Desafío de Ingeniería (huevo), Pitch de Solución y Prototipado](bitacora/S14.md)
 
 ## Evidencias principales
 1. **Acta de Constitución y Gobernanza del Equipo (S02)**
